@@ -1,0 +1,595 @@
+<title>百人一首トレーニング</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: 1-column mobile app. Poem cards are vertical (tategaki), 3 columns for the upper verse, 2 for the lower, like a real karuta card. */
+:root{
+  --bg:#eceff3; --surface:#f8f9fb; --paper:#fcfcf9; --ink:#17202e; --muted:#5a6575; --line:#ccd2dc;
+  --accent:#27407a; --accent-ink:#ffffff; --ok:#1f7a54; --ng:#b3372b; --late:#8b94a3;
+  --serif:'Shippori Mincho','Hiragino Mincho ProN','Yu Mincho',serif;
+  --sans:'Zen Kaku Gothic New','Hiragino Sans','Yu Gothic',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e141f; --surface:#161e2c; --paper:#1b2536; --ink:#e6eaf2; --muted:#9aa5b8; --line:#2b3649;
+    --accent:#8aa6e8; --accent-ink:#0e141f; --ok:#58c79a; --ng:#ef7f72; --late:#6f7b90; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e141f; --surface:#161e2c; --paper:#1b2536; --ink:#e6eaf2; --muted:#9aa5b8; --line:#2b3649;
+  --accent:#8aa6e8; --accent-ink:#0e141f; --ok:#58c79a; --ng:#ef7f72; --late:#6f7b90; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;
+  padding-block:14px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-family:var(--serif);font-size:26px;line-height:1.2;margin:0;letter-spacing:.06em}
+h2{font-size:13px;margin:0 0 8px;color:var(--muted);letter-spacing:.12em;font-weight:700}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{min-width:0}
+.btn{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:11px 16px;cursor:pointer;min-height:44px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.big{width:100%;padding:16px;font-size:17px}
+.btn.small{padding:6px 12px;min-height:34px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,.chip:focus-visible,.opt:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.chip{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 14px;cursor:pointer;min-height:36px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+label.f{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted)}
+input[type=number],select,textarea,input[type=text]{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px}
+input[type=number]{width:84px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+textarea{width:100%;min-height:150px;font-size:13px}
+.note{font-size:13px;color:var(--muted)}
+.banner{border:1px dashed var(--accent);border-radius:10px;padding:12px;font-size:14px}
+.count{font-weight:700;color:var(--accent)}
+.modes{display:grid;gap:10px}
+.modes .btn small{display:block;font-weight:400;font-size:12px;opacity:.85}
+/* vertical poem */
+.vert{writing-mode:vertical-rl;text-orientation:upright;font-family:var(--serif);letter-spacing:.08em;line-height:1.5}
+.vert .ph{margin-left:.7em}
+.kami{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 10px;display:flex;justify-content:center;align-items:flex-start}
+.kami .vert{font-size:clamp(22px,7.4vw,32px);font-weight:500;min-height:8em}
+.c{opacity:0;visibility:hidden;transition:opacity .2s}
+.c.on{opacity:1;visibility:visible}
+.c.late{opacity:.5;color:var(--late)}
+.opts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.opt{font:inherit;background:var(--paper);color:var(--ink);border:1.5px solid var(--line);border-radius:8px;padding:12px 4px;cursor:pointer;display:flex;justify-content:center;align-items:flex-start;min-height:9.5em}
+.opt .vert{font-size:clamp(14px,4.2vw,19px)}
+.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--paper))}
+.opt.wrong{border-color:var(--ng);background:color-mix(in srgb,var(--ng) 14%,var(--paper))}
+.opt[aria-disabled="true"]{cursor:pointer}
+.prog{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.bar{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.fb{display:flex;flex-direction:column;gap:10px}
+.mark{font-family:var(--serif);font-size:44px;line-height:1;font-weight:700}
+.mark.ok{color:var(--ok)} .mark.ng{color:var(--ng)}
+.poemfull{border-top:1px solid var(--line);padding-top:10px;font-size:15px}
+.poemfull .j{font-family:var(--serif);font-size:17px}
+.poemfull .r{color:var(--muted);font-size:12px}
+.poemfull .a{margin-top:4px;font-size:13px}
+.big-score{font-family:var(--serif);font-size:44px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.miss{display:flex;flex-direction:column;gap:12px}
+.miss .poemfull{border-top:none;padding-top:0}
+.miss li{list-style:none;border-bottom:1px solid var(--line);padding-bottom:10px}
+ul{margin:0;padding:0}
+.fold{margin-top:10px;border-top:1px solid var(--line);padding-top:6px}
+.fold summary{cursor:pointer;font-weight:700;font-size:14px;min-height:38px;display:flex;align-items:center;gap:8px}
+.grp{display:flex;flex-direction:column;gap:4px;margin:8px 0}
+.gname{font-size:12px;color:var(--muted)}
+.ansrow{display:flex;gap:8px}
+.ansrow input{flex:1}
+.num{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){.c{transition:none}}
+</style>
+
+<main id="app"></main>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- fixed reference tables (poem number -> poet, season/theme) ---------- */
+var GENRE_GROUPS=[
+ {k:'a',name:'季節',tags:['春','夏','秋','冬']},
+ {k:'b',name:'部立て',tags:['恋','旅','別れ','雑']},
+ {k:'c',name:'動物',tags:['虫','鳥','動物']},
+ {k:'d',name:'植物',tags:['植物','桜']},
+ {k:'e',name:'気象',tags:['気象']},
+ {k:'f',name:'自然',tags:['自然','月']},
+ {k:'g',name:'人物',tags:['人物']},
+ {k:'h',name:'事物',tags:['事物','衣']},
+ {k:'i',name:'時刻',tags:['明け方','朝','夕方','夜']},
+ {k:'j',name:'歌枕・地名',tags:['地名']}
+];
+var GENRE_SET={};
+GENRE_GROUPS.forEach(function(g){g.tags.forEach(function(t){GENRE_SET[t]=1})});
+var GENRE_ALIAS={'離別':'別れ','別離':'別れ'};
+var EMOTIONS=['スゴイ！キレイ！','さびしい','すき！','かなしい','しみじみ','悩み・苦しみ','怒り'];
+var EMO_ALIAS={'すごいきれい':0,'すごい':0,'きれい':0,'さびしい':1,'寂しい':1,'すき':2,'好き':2,'かなしい':3,'悲しい':3,'しみじみ':4,'悩み苦しみ':5,'悩み':5,'苦しみ':5,'なやみ':5,'怒り':6,'いかり':6};
+var AUTHORS=['天智天皇','持統天皇','柿本人麻呂','山部赤人','猿丸大夫','中納言家持','阿倍仲麻呂','喜撰法師','小野小町','蝉丸',
+'参議篁','僧正遍昭','陽成院','河原左大臣','光孝天皇','中納言行平','在原業平朝臣','藤原敏行朝臣','伊勢','元良親王',
+'素性法師','文屋康秀','大江千里','菅家','三条右大臣','貞信公','中納言兼輔','源宗于朝臣','凡河内躬恒','壬生忠岑',
+'坂上是則','春道列樹','紀友則','藤原興風','紀貫之','清原深養父','文屋朝康','右近','参議等','平兼盛',
+'壬生忠見','清原元輔','権中納言敦忠','中納言朝忠','謙徳公','曽禰好忠','恵慶法師','源重之','大中臣能宣朝臣','藤原義孝',
+'藤原実方朝臣','藤原道信朝臣','右大将道綱母','儀同三司母','大納言公任','和泉式部','紫式部','大弐三位','赤染衛門','小式部内侍',
+'伊勢大輔','清少納言','左京大夫道雅','権中納言定頼','相模','前大僧正行尊','周防内侍','三条院','能因法師','良暹法師',
+'大納言経信','祐子内親王家紀伊','権中納言匡房','源俊頼朝臣','藤原基俊','法性寺入道前関白太政大臣','崇徳院','源兼昌','左京大夫顕輔','待賢門院堀河',
+'後徳大寺左大臣','道因法師','皇太后宮大夫俊成','藤原清輔朝臣','俊恵法師','西行法師','寂蓮法師','皇嘉門院別当','式子内親王','殷富門院大輔',
+'後京極摂政前太政大臣','二条院讃岐','鎌倉右大臣','参議雅経','前大僧正慈円','入道前太政大臣','権中納言定家','従二位家隆','後鳥羽院','順徳院'];
+var GENRES=['秋','夏','恋','冬','秋','冬','旅','雑','春','雑',
+'旅','雑','恋','恋','春','離別','秋','恋','恋','恋',
+'恋','秋','秋','旅','恋','秋','恋','冬','秋','恋',
+'冬','秋','春','雑','春','夏','秋','恋','恋','恋',
+'恋','恋','恋','恋','恋','恋','秋','恋','恋','恋',
+'恋','恋','恋','恋','雑','恋','雑','恋','恋','雑',
+'春','雑','恋','冬','恋','春','春','雑','秋','秋',
+'秋','恋','春','恋','雑','雑','恋','冬','秋','恋',
+'夏','恋','雑','雑','恋','恋','秋','恋','恋','恋',
+'秋','恋','旅','秋','雑','春','恋','夏','雑','雑'];
+
+/* ---------- demo data: original verses written for testing, NOT from the anthology ---------- */
+var DEMO=[
+ {no:1,genre:'春',author:'デモ(オリジナル)',kami:'はるのあめ やねをならして ふりやまず',kamiKana:'はるのあめ やねをならして ふりやまず',shimo:'まどのさくらは ひらきはじめぬ',shimoKana:'まどのさくらは ひらきはじめぬ'},
+ {no:2,genre:'夏',author:'デモ(オリジナル)',kami:'なつのよる ほたるのひかり ゆれながら',kamiKana:'なつのよる ほたるのひかり ゆれながら',shimo:'かわのながれに ほしをうつしぬ',shimoKana:'かわのながれに ほしをうつしぬ'},
+ {no:3,genre:'秋',author:'デモ(オリジナル)',kami:'あきのかぜ ふくやまみちに おちばしき',kamiKana:'あきのかぜ ふくやまみちに おちばしき',shimo:'ひとりあるけば ことりのなくね',shimoKana:'ひとりあるけば ことりのなくね'},
+ {no:4,genre:'冬',author:'デモ(オリジナル)',kami:'ふゆのあさ こおりのはしら とけはじめ',kamiKana:'ふゆのあさ こおりのはしら とけはじめ',shimo:'のきのしずくが おとをたてけり',shimoKana:'のきのしずくが おとをたてけり'},
+ {no:5,genre:'恋',author:'デモ(オリジナル)',kami:'ひさしぶり ともとかたりし ゆうぐれに',kamiKana:'ひさしぶり ともとかたりし ゆうぐれに',shimo:'つきがのぼるを ふたりでみてた',shimoKana:'つきがのぼるを ふたりでみてた'}
+];
+
+function fixPoem(p){
+  if(!Array.isArray(p.genres)){
+    p.genres=p.genre?[GENRE_ALIAS[p.genre]||String(p.genre)]:[];
+  }
+  if(!Array.isArray(p.feelings))p.feelings=[];
+  return p;
+}
+DEMO.forEach(fixPoem);
+DEMO[0].genres=['春','桜'];DEMO[0].feelings=['スゴイ！キレイ！'];
+DEMO[1].genres=['夏','虫','夜'];DEMO[1].feelings=['しみじみ'];
+DEMO[2].genres=['秋','鳥'];DEMO[2].feelings=['さびしい'];
+DEMO[3].genres=['冬','朝'];DEMO[3].feelings=['しみじみ'];
+DEMO[4].genres=['恋','夕方','月'];DEMO[4].feelings=['すき！'];
+
+/* ---------- storage helpers ---------- */
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
+
+var $app=document.getElementById('app');
+var data=loadData();
+var S=loadSettings();
+var timer=null, Q=null;
+
+function loadData(){
+  var raw=lsGet('hyakunin_data_v1');
+  if(raw){try{var d=JSON.parse(raw);if(Array.isArray(d)&&d.length>=4)return d.map(fixPoem)}catch(e){}}
+  return DEMO.slice();
+}
+function isDemo(){return data.length&&data[0].author==='デモ(オリジナル)'}
+function loadSettings(){
+  var d={from:1,to:100,tags:[],feel:[],speed:0.8,script:'kana',count:'all'};
+  var raw=lsGet('hyakunin_settings_v1');
+  if(raw){try{var s=JSON.parse(raw);for(var k in d){if(s[k]!==undefined)d[k]=s[k]}}catch(e){}}
+  return d;
+}
+function saveSettings(){lsSet('hyakunin_settings_v1',JSON.stringify(S))}
+
+/* ---------- text helpers ---------- */
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function toHira(s){return s.replace(/[ァ-ヶ]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0x60)})}
+var SAME={'を':'お','ゐ':'い','ゑ':'え','ぢ':'じ','づ':'ず','は':'わ','ひ':'い','ふ':'う','へ':'え','ほ':'お'};
+function norm(s){
+  s=toHira(String(s).normalize('NFKC')).replace(/[\s、。・,.!?「」ー]/g,'');
+  var out='';
+  for(var i=0;i<s.length;i++){out+=SAME[s[i]]||s[i]}
+  return out;
+}
+function moras(s){
+  var r=[];
+  for(var ch of s){
+    if(/[ゃゅょぁぃぅぇぉゎ]/.test(ch)&&r.length)r[r.length-1]+=ch;else r.push(ch);
+  }
+  return r;
+}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+
+/* phrases(p,'kami') -> array of arrays of display units */
+function phrases(p,part){
+  var lens=part==='kami'?[5,7,5]:[7,7];
+  var t=S.script==='kanji'?p[part]:p[part+'Kana'];
+  if(S.script==='kanji'&&!/[\s　]/.test(t))t=p[part+'Kana'];
+  var useMora=(t===p[part+'Kana']);
+  var parts;
+  if(/[\s　]/.test(t.trim())){
+    parts=t.trim().split(/[\s　]+/);
+  }else{
+    var u=moras(t),sum=lens.reduce(function(a,b){return a+b},0);
+    if(u.length===sum){parts=[];var pos=0;lens.forEach(function(n){parts.push(u.slice(pos,pos+n).join(''));pos+=n})}
+    else parts=[t];
+  }
+  return parts.map(function(ph){return useMora?moras(ph):Array.from(ph)});
+}
+function plainText(p,part,kana){
+  var t=kana?p[part+'Kana']:p[part];
+  return t.trim().replace(/[\s　]+/g,' ');
+}
+function vertHTML(ph,withSpans){
+  var i=0;
+  return '<div class="vert">'+ph.map(function(line){
+    return '<div class="ph">'+line.map(function(c){
+      return withSpans?'<span class="c" data-i="'+(i++)+'">'+esc(c)+'</span>':esc(c);
+    }).join('')+'</div>';
+  }).join('')+'</div>';
+}
+function unitCount(ph){return ph.reduce(function(a,l){return a+l.length},0)}
+
+/* ---------- selection ---------- */
+function pool(){
+  var anyOf=function(have,want){return !want.length||have.some(function(x){return want.indexOf(x)>=0})};
+  return data.filter(function(p){return p.no>=S.from&&p.no<=S.to&&anyOf(p.genres,S.tags)&&anyOf(p.feelings,S.feel)});
+}
+
+/* ---------- views ---------- */
+function stopTimer(){if(timer){clearInterval(timer);timer=null}}
+function go(fn){stopTimer();if(Q)Q.active=false;fn();window.scrollTo(0,0)}
+
+function chipHTML(kind,val,arr){
+  return '<button class="chip" data-act="'+kind+'" data-g="'+esc(val)+'" aria-pressed="'+(arr.indexOf(val)>=0)+'">'+esc(val)+'</button>';
+}
+function home(){
+  var n=pool().length;
+  var h='';
+  h+='<header><h1>百人一首トレーニング</h1><p class="sub">かるた大会に向けた、上の句から下の句を引く練習</p></header>';
+  if(isDemo()){
+    h+='<div class="banner">いまはテスト用のオリジナル歌が5首入っています。百人一首の本文を読み込むと、全100首で練習できます。<div class="row" style="margin-top:8px"><button class="btn small primary" data-act="data">歌データを読み込む</button></div></div>';
+  }
+  h+='<section class="card"><h2>出題する歌</h2>';
+  h+='<div class="row" style="margin-bottom:10px"><button class="chip" data-act="p-all">全部</button><button class="chip" data-act="p-10">1〜10番</button><button class="chip" data-act="p-koi">恋の歌</button><button class="chip" data-act="p-aki">秋の歌</button></div>';
+  h+='<div class="row" style="margin-bottom:10px"><label class="f">番号 から<input type="number" id="from" min="1" max="100" inputmode="numeric" value="'+S.from+'"></label><span style="padding-top:18px">〜</span><label class="f">まで<input type="number" id="to" min="1" max="100" inputmode="numeric" value="'+S.to+'"></label></div>';
+  h+='<details class="fold"'+(S.tags.length?' open':'')+'><summary>ジャンルで絞る <span class="num count" id="tagn">'+(S.tags.length?S.tags.length+'件選択中':'')+'</span></summary>'+
+    GENRE_GROUPS.map(function(gr){return '<div class="grp"><span class="gname">'+gr.k+'. '+esc(gr.name)+'</span><div class="row">'+gr.tags.map(function(g){return chipHTML('g',g,S.tags)}).join('')+'</div></div>'}).join('')+'</details>';
+  h+='<details class="fold"'+(S.feel.length?' open':'')+'><summary>気持ちで絞る <span class="num count" id="feeln">'+(S.feel.length?S.feel.length+'件選択中':'')+'</span></summary><div class="row" style="margin-top:8px">'+
+    EMOTIONS.map(function(g){return chipHTML('f',g,S.feel)}).join('')+'</div></details>';
+  h+='<p class="note" style="margin:10px 0 0">対象 <span class="count num" id="cnt">'+n+'</span> 首</p></section>';
+  h+='<section class="card"><h2>設定</h2>';
+  h+='<label class="f" for="speed">上の句の表示速度 <span class="num" id="speedv">'+S.speed.toFixed(1)+'</span> 秒 / 1文字</label><input type="range" id="speed" min="0.2" max="2" step="0.1" value="'+S.speed+'">';
+  h+='<div class="row" style="margin-top:12px"><label class="f" for="count">出題数<select id="count">'+['10','20','50','all'].map(function(v){return '<option value="'+v+'"'+(String(S.count)===v?' selected':'')+'>'+(v==='all'?'全部':v+'問')+'</option>'}).join('')+'</select></label>';
+  h+='<div class="f">表記<div class="row"><button class="chip" data-act="script" data-s="kana" aria-pressed="'+(S.script==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-s="kanji" aria-pressed="'+(S.script==='kanji')+'">漢字まじり</button></div></div></div></section>';
+  h+='<section class="modes"><button class="btn primary big" data-act="start4"'+(n?'':' disabled')+'>4択トレーニング<small>上の句が1文字ずつ出る。下の句を4つから選ぶ</small></button>';
+  h+='<button class="btn primary big" data-act="startFill"'+(n?'':' disabled')+'>穴埋めトレーニング<small>「わかった」で止めて、下の句を打ち込む</small></button></section>';
+  h+='<div class="row"><button class="btn small" data-act="data">歌データの管理</button><span class="note">収録 <span class="num">'+data.length+'</span> 首</span></div>';
+  $app.innerHTML=h;
+}
+
+function dataView(msg){
+  var h='<header><h1>歌データ</h1><p class="sub">収録 <span class="num">'+data.length+'</span> 首'+(isDemo()?'(テスト用)':'')+'</p></header>';
+  h+='<section class="card"><h2>CSVで読み込む</h2><p class="note" style="margin-top:0">1首1行のCSVファイルを選びます。1行目に見出し行を付けてください。</p>';
+  h+='<pre style="font-size:12px;overflow-x:auto;margin:0 0 8px;padding:8px;background:var(--paper);border:1px solid var(--line);border-radius:8px">番号,初句,二句,三句,四句,五句,初句のよみ,二句のよみ,三句のよみ,四句のよみ,五句のよみ,ジャンル1,ジャンル2,ジャンル3,ジャンル4,ジャンル5,ジャンル6,気持ち</pre>';
+  h+='<p class="note">句ごとにセルを分けて入れます。読みはひらがなだけにします。上の句は初句〜三句、下の句は四句と五句で、札と同じ縦書きの段組みで表示されます。</p>';
+  h+='<p class="note">ジャンルは最大6つまで、ジャンル1〜ジャンル6の列にセルを分けて入れます(使わない列は空のままで構いません)。気持ちは1つだけです。1行目の見出しの名前で列を判定するので、列の順番を変えても読み込めます。ジャンルの列がないときは、番号から季節か部立てを1つだけ自動で付けます。作者は番号から自動で付きます。読みの音数が5・7・5・7・7と合わない句は、確認用に知らせます。文字コードはUTF-8とShift_JISに対応しています。以前の形式(上の句・下の句を1欄ずつ入れる形や、ジャンルを1つの欄にまとめる形)でも読み込めます。</p>';
+  h+='<details class="fold"><summary>使えるジャンルと気持ちの名前</summary>'+GENRE_GROUPS.map(function(gr){return '<p class="note" style="margin:4px 0"><strong>'+gr.k+'. '+esc(gr.name)+'</strong>: '+gr.tags.map(esc).join('、')+'</p>'}).join('')+'<p class="note" style="margin:4px 0"><strong>気持ち</strong>: '+EMOTIONS.map(esc).join('、')+'</p></details>';
+  h+='<label class="btn primary" for="csvFile" style="display:inline-flex;align-items:center;cursor:pointer">CSVファイルを選ぶ</label><input type="file" id="csvFile" accept=".csv,.tsv,.txt,text/csv,text/plain" style="position:absolute;opacity:0;width:1px;height:1px">';
+  h+='<p class="note" style="margin:14px 0 6px">または、CSVの中身を貼り付けます。</p>';
+  h+='<label class="f" for="importText">貼り付け欄</label><textarea id="importText" placeholder="番号,初句,二句,三句,四句,五句,初句のよみ,…"></textarea>';
+  h+='<div class="row" style="margin-top:10px"><button class="btn primary" data-act="import">読み込む</button>'+(isDemo()?'':'<button class="btn" data-act="resetdemo">テスト用に戻す</button>')+'<button class="btn" data-act="home">戻る</button></div>';
+  if(msg)h+='<p class="note" id="msg" style="margin-top:10px;color:var(--ink)">'+msg+'</p>';
+  h+='</section>';
+  $app.innerHTML=h;
+}
+
+/* CSV parser: quoted fields, escaped quotes, CRLF, BOM. Tab is used when a line has tabs but no commas. */
+function parseCSV(text){
+  text=text.replace(/^﻿/,'');
+  var first=text.split(/\r?\n/)[0]||'';
+  var d=(first.indexOf('\t')>=0&&first.indexOf(',')<0)?'\t':',';
+  var rows=[],row=[],cur='',q=false;
+  for(var i=0;i<text.length;i++){
+    var ch=text[i];
+    if(q){
+      if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}
+      else cur+=ch;
+    }else if(ch==='"'&&cur===''){q=true}
+    else if(ch===d){row.push(cur);cur=''}
+    else if(ch==='\n'||ch==='\r'){
+      if(ch==='\r'&&text[i+1]==='\n')i++;
+      row.push(cur);cur='';rows.push(row);row=[];
+    }else cur+=ch;
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row)}
+  return rows.filter(function(r){return r.some(function(c){return c.trim()!==''})});
+}
+function splitCell(s){return String(s||'').split(/[\s　\/／、;；|,，]+/).filter(Boolean)}
+function emoKey(s){return toHira(String(s).replace(/[！!・\s　]/g,''))}
+function isHira(s){return /^[ぁ-ゖー\s　]+$/.test(s)}
+var PH_LENS=[5,7,5,7,7],PH_NAMES=['初句','二句','三句','四句','五句'];
+function squash(s){return String(s||'').replace(/[\s　]+/g,'')}
+function parseImport(text){
+  text=text.trim();
+  var errors=[],warns=[],out=[],seen={};
+  var table=parseCSV(text);
+  var col=null,start=0;
+  if(table.length&&!/\d/.test(String(table[0][0]).normalize('NFKC'))){
+    start=1;
+    var m={p:[],k:[],gc:[]};
+    table[0].forEach(function(h,i){
+      h=h.trim();
+      var isK=/よみ|読み|かな/.test(h),pi=-1;
+      if(/初句|一句|第1句|第一句/.test(h))pi=0;
+      else if(/二句|第2句|第二句/.test(h))pi=1;
+      else if(/三句|第3句|第三句/.test(h))pi=2;
+      else if(/四句|第4句|第四句/.test(h))pi=3;
+      else if(/五句|第5句|第五句/.test(h))pi=4;
+      if(/番号|^no$/i.test(h))m.no=i;
+      else if(/ジャンル|分類/.test(h))m.gc.push(i);
+      else if(/気持ち|感情/.test(h))m.feel=i;
+      else if(pi>=0){(isK?m.k:m.p)[pi]=i}
+      else if(/^上/.test(h)){if(isK)m.kamiKana=i;else m.kami=i}
+      else if(/^下/.test(h)){if(isK)m.shimoKana=i;else m.shimo=i}
+    });
+    var hasPh=[0,1,2,3,4].every(function(i){return m.k[i]!==undefined});
+    if(m.no!==undefined&&hasPh)col={mode:'phrase',m:m};
+    else if(m.no!==undefined&&m.kamiKana!==undefined&&m.shimoKana!==undefined)col={mode:'two',m:m};
+  }
+  function cell(c,i){return i===undefined?'':(c[i]||'')}
+  for(var ri=start;ri<table.length;ri++){
+    var c=table[ri].map(function(x){return x.trim()});
+    var ln=ri+1,r=null,n=c.length;
+    while(n&&c[n-1]==='')n--;
+    if(!n)continue;
+    if(col&&col.mode==='phrase'){
+      var mm=col.m,pk=[],pj=[];
+      for(var q=0;q<5;q++){var kq=squash(cell(c,mm.k[q]));pk.push(kq);pj.push(squash(cell(c,mm.p[q]))||kq)}
+      r={no:cell(c,mm.no),ph:pj,phK:pk,genre:mm.gc.length?mm.gc.map(function(i){return cell(c,i)}).join(' '):null,feel:cell(c,mm.feel)};
+    }else if(col&&col.mode==='two'){
+      var m2=col.m;
+      r={no:cell(c,m2.no),kami:cell(c,m2.kami!==undefined?m2.kami:m2.kamiKana),kamiKana:cell(c,m2.kamiKana),
+        shimo:cell(c,m2.shimo!==undefined?m2.shimo:m2.shimoKana),shimoKana:cell(c,m2.shimoKana),
+        genre:m2.gc.length?m2.gc.map(function(i){return cell(c,i)}).join(' '):null,feel:cell(c,m2.feel)};
+    }else if(n>=11){
+      var gNew=n>=14;
+      r={no:c[0],ph:c.slice(1,6).map(squash),phK:c.slice(6,11).map(squash),genre:n>=12?(gNew?c.slice(11,17).join(' '):c[11]):null,feel:gNew?(c[17]||''):(c[12]||'')};
+      for(var z=0;z<5;z++)if(!r.ph[z])r.ph[z]=r.phK[z];
+    }else if(n>=5&&n<=7){
+      r={no:c[0],kami:c[1],kamiKana:c[2],shimo:c[3],shimoKana:c[4],genre:n>=6?c[5]:null,feel:c[6]||''};
+    }else if(n===3){
+      r={no:c[0],kami:c[1],kamiKana:c[1],shimo:c[2],shimoKana:c[2],genre:null,feel:''};
+    }else{errors.push(ln+'行目: 列の数が合いません');continue}
+    var no=parseInt(String(r.no||'').normalize('NFKC').replace(/\D/g,''),10);
+    if(!no||no<1||no>100){errors.push(ln+'行目: 番号が1〜100ではありません');continue}
+    var kami,kamiK,shimo,shimoK;
+    if(r.ph){
+      var emptyAt=-1;
+      for(var e=0;e<5;e++)if(!r.phK[e]||!r.ph[e]){emptyAt=e;break}
+      if(emptyAt>=0){errors.push(no+'番: '+PH_NAMES[emptyAt]+'が空です');continue}
+      r.phK=r.phK.map(toHira);
+      var badAt=-1;
+      for(var b=0;b<5;b++)if(!isHira(r.phK[b])){badAt=b;break}
+      if(badAt>=0){errors.push(no+'番: '+PH_NAMES[badAt]+'の読みにひらがな以外が含まれています');continue}
+      for(var w=0;w<5;w++){var mc=moras(r.phK[w]).length;if(mc!==PH_LENS[w])warns.push(no+'番: '+PH_NAMES[w]+'の読みが'+mc+'音です('+PH_LENS[w]+'音のはず)')}
+      kami=r.ph.slice(0,3).join(' ');kamiK=r.phK.slice(0,3).join(' ');
+      shimo=r.ph.slice(3).join(' ');shimoK=r.phK.slice(3).join(' ');
+    }else{
+      kami=String(r.kami||'').trim();shimo=String(r.shimo||'').trim();
+      kamiK=toHira(String(r.kamiKana||'')).trim();shimoK=toHira(String(r.shimoKana||'')).trim();
+      if(!kami||!shimo||!kamiK||!shimoK){errors.push(no+'番: 空の欄があります');continue}
+      if(!isHira(kamiK)||!isHira(shimoK)){errors.push(no+'番: 読みにひらがな以外が含まれています');continue}
+    }
+    if(seen[no]){errors.push(no+'番: 重複しています');continue}
+    seen[no]=1;
+    var gens=[],feels=[];
+    if(r.genre===null){
+      var d0=GENRES[no-1];gens=[GENRE_ALIAS[d0]||d0];
+    }else{
+      splitCell(r.genre).forEach(function(t){
+        t=GENRE_ALIAS[t]||t;
+        if(GENRE_SET[t]){if(gens.indexOf(t)<0)gens.push(t)}
+        else warns.push(no+'番: 未対応のジャンル名「'+t+'」');
+      });
+    }
+    splitCell(r.feel).forEach(function(t){
+      var k=EMO_ALIAS[emoKey(t)];
+      if(k===undefined)warns.push(no+'番: 未対応の気持ち「'+t+'」');
+      else if(feels.indexOf(EMOTIONS[k])<0)feels.push(EMOTIONS[k]);
+    });
+    if(gens.length>6){warns.push(no+'番: ジャンルは6つまでです(先頭の6つだけ使います)');gens=gens.slice(0,6)}
+    if(feels.length>1){warns.push(no+'番: 気持ちは1つだけです(先頭の「'+feels[0]+'」だけ使います)');feels=feels.slice(0,1)}
+    out.push({no:no,genres:gens,feelings:feels,author:AUTHORS[no-1],kami:kami,kamiKana:kamiK,shimo:shimo,shimoKana:shimoK});
+  }
+  out.sort(function(a,b){return a.no-b.no});
+  return {out:out,errors:errors,warns:warns};
+}
+
+/* ---------- quiz ---------- */
+function startQuiz(mode,list){
+  stopTimer();
+  Q={mode:mode,list:list,i:0,recs:[],answered:false,rev:0,total:0,opts:null,stage:'ask',active:true,nextOkAt:0};
+  showQ();
+}
+function makeList(){
+  var l=shuffle(pool());
+  if(S.count!=='all')l=l.slice(0,parseInt(S.count,10));
+  return l;
+}
+function showQ(){
+  var p=Q.list[Q.i];
+  var kp=phrases(p,'kami');
+  Q.total=unitCount(kp);Q.rev=0;Q.answered=false;Q.stage='ask';
+  var h='<div class="prog"><span class="num">'+(Q.i+1)+' / '+Q.list.length+'</span><div class="bar"><i style="width:'+(Q.i/Q.list.length*100)+'%"></i></div><button class="btn small" data-act="quit">やめる</button></div>';
+  h+='<div class="kami" id="kami">'+vertHTML(kp,true)+'</div>';
+  if(Q.mode==='choice'){
+    var others=shuffle(data.filter(function(x){return x.no!==p.no})).slice(0,3);
+    Q.opts=shuffle([p].concat(others));
+    h+='<div class="opts" id="opts">'+Q.opts.map(function(o,k){
+      return '<button class="opt" data-act="pick" data-k="'+k+'" aria-label="選択肢'+(k+1)+'">'+vertHTML(phrases(o,'shimo'),false)+'</button>';
+    }).join('')+'</div>';
+    h+='<div id="fb"></div>';
+  }else{
+    h+='<div id="fb"><button class="btn primary big" data-act="wakatta">わかった</button></div>';
+  }
+  $app.innerHTML=h;
+  var tick=function(){
+    if(Q.rev<Q.total){
+      var el=document.querySelector('.c[data-i="'+Q.rev+'"]');
+      if(el)el.classList.add('on');
+      Q.rev++;
+    }
+    if(Q.rev>=Q.total)stopTimer();
+  };
+  setTimeout(function(){if(Q&&!Q.answered&&Q.stage==='ask'&&!timer){tick();timer=setInterval(tick,Math.max(100,S.speed*1000))}},350);
+}
+function freezeKami(keepHidden){
+  stopTimer();
+  if(keepHidden)return; /* leave unrevealed characters fully hidden */
+  document.querySelectorAll('.c').forEach(function(el){
+    var i=parseInt(el.dataset.i,10);
+    el.classList.add('on');
+    if(i>=Q.rev)el.classList.add('late');
+  });
+}
+function fullPoem(p){
+  return '<div class="poemfull"><div class="j">'+esc(plainText(p,'kami',false))+'</div><div class="j">'+esc(plainText(p,'shimo',false))+'</div>'+
+    '<div class="r">'+esc(plainText(p,'kami',true))+' / '+esc(plainText(p,'shimo',true))+'</div>'+
+    '<div class="a">'+(isDemo()?'':'<span class="num">'+p.no+'</span>番　')+esc(p.author)+'</div>'+
+    ((p.genres.length||p.feelings.length)?'<div class="note">'+(p.genres.length?'ジャンル: '+esc(p.genres.join('・')):'')+(p.genres.length&&p.feelings.length?'　':'')+(p.feelings.length?'気持ち: '+esc(p.feelings.join('・')):'')+'</div>':'')+'</div>';
+}
+function feedback(ok,extra){
+  var p=Q.list[Q.i],last=Q.i>=Q.list.length-1;
+  var shown=Q.rev===0?'1文字も出る前':(Q.rev>=Q.total?'最後まで見て':Q.rev+'文字目で');
+  var h='<div class="card fb"><div class="row"><span class="mark '+(ok?'ok':'ng')+'" aria-hidden="true">'+(ok?'○':'×')+'</span><div><strong>'+(ok?'正解':'不正解')+'</strong><div class="note">'+shown+(Q.mode==='choice'?'答えた':'止めた')+'</div></div></div>'+(extra||'')+fullPoem(p)+(Q.mode==='choice'?'<p class="note" style="margin:0;text-align:center">画面のどこかをタップすると次へ進みます</p>':'')+
+    '<button class="btn primary big" data-act="next" id="nextBtn">'+(last?'結果を見る':'次の歌へ')+'</button></div>';
+  document.getElementById('fb').innerHTML=h;
+  var nb=document.getElementById('nextBtn');if(nb)nb.focus({preventScroll:true});
+}
+function pick(k){
+  if(Q.answered)return;
+  Q.answered=true;Q.stage='done';Q.nextOkAt=Date.now()+400;
+  var p=Q.list[Q.i];
+  freezeKami();
+  var ok=Q.opts[k].no===p.no;
+  var btns=document.querySelectorAll('.opt');
+  btns.forEach(function(b,i){
+    b.setAttribute('aria-disabled','true');
+    if(Q.opts[i].no===p.no)b.classList.add('correct');
+    else if(i===k)b.classList.add('wrong');
+  });
+  Q.recs.push({p:p,ok:ok,shown:Q.rev});
+  feedback(ok);
+}
+function wakatta(){
+  if(Q.stage!=='ask')return;
+  Q.stage='input';
+  freezeKami(true);
+  document.getElementById('fb').innerHTML='<div class="card fb"><label class="f" for="ans">下の句をひらがなで入力</label><div class="ansrow"><input type="text" id="ans" lang="ja" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ひらがな"><button class="btn primary" data-act="submit">答える</button></div><p class="note" style="margin:0">「は」と「わ」、「へ」と「え」など同じ音は区別せずに判定します。</p></div>';
+  var a=document.getElementById('ans');if(a)a.focus();
+}
+function submitFill(){
+  if(Q.stage!=='input')return;
+  var v=document.getElementById('ans').value;
+  if(!v.trim())return;
+  Q.stage='done';Q.answered=true;
+  freezeKami(false);
+  var p=Q.list[Q.i];
+  var ok=norm(v)===norm(p.shimoKana)||v.replace(/[\s　]/g,'')===p.shimo.replace(/[\s　]/g,'');
+  Q.recs.push({p:p,ok:ok,shown:Q.rev,given:v});
+  feedback(ok,'<div class="note">あなたの答え: <strong style="color:var(--ink)">'+esc(v)+'</strong></div>');
+}
+function next(){
+  if(Q.i>=Q.list.length-1){result();return}
+  Q.i++;showQ();window.scrollTo(0,0);
+}
+function result(){
+  stopTimer();if(Q)Q.active=false;
+  var n=Q.recs.length,ok=Q.recs.filter(function(r){return r.ok}).length;
+  var okRecs=Q.recs.filter(function(r){return r.ok});
+  var avg=okRecs.length?(okRecs.reduce(function(a,r){return a+r.shown},0)/okRecs.length):null;
+  var miss=Q.recs.filter(function(r){return !r.ok});
+  var h='<header><h1>結果</h1><p class="sub">'+(Q.mode==='choice'?'4択トレーニング':'穴埋めトレーニング')+'</p></header>';
+  h+='<section class="card"><div class="big-score num">'+ok+' <span style="font-size:22px">/ '+n+'</span></div><p class="note" style="margin:6px 0 0">正答率 <span class="num">'+(n?Math.round(ok/n*100):0)+'</span>%'+(avg!==null?'　正解した歌の平均は <span class="num">'+avg.toFixed(1)+'</span> 文字目':'')+'</p>';
+  h+='<p class="note" style="margin:4px 0 0">平均の文字数が少ないほど、早く決まり字に気づけています。</p></section>';
+  if(miss.length){
+    h+='<section class="card"><h2>間違えた歌 <span class="num">'+miss.length+'</span> 首</h2><ul class="miss">'+miss.map(function(r){return '<li>'+fullPoem(r.p)+(r.given?'<div class="note">あなたの答え: '+esc(r.given)+'</div>':'')+'</li>'}).join('')+'</ul></section>';
+  }
+  h+='<div class="modes">'+(miss.length?'<button class="btn primary big" data-act="retry">間違えた歌だけ復習する</button>':'')+'<button class="btn big" data-act="again">もう一度(同じ設定)</button><button class="btn big" data-act="home">ホームへ</button></div>';
+  Q.missList=miss.map(function(r){return r.p});
+  $app.innerHTML=h;window.scrollTo(0,0);
+}
+
+/* ---------- events ---------- */
+function refreshCount(){var c=document.getElementById('cnt');if(c)c.textContent=pool().length;
+  var tn=document.getElementById('tagn');if(tn)tn.textContent=S.tags.length?S.tags.length+'件選択中':'';
+  var fn=document.getElementById('feeln');if(fn)fn.textContent=S.feel.length?S.feel.length+'件選択中':'';
+  var dis=pool().length===0;document.querySelectorAll('[data-act="start4"],[data-act="startFill"]').forEach(function(b){b.disabled=dis})}
+$app.addEventListener('click',function(e){
+  var t=e.target.closest('[data-act]');if(!t)return;
+  var a=t.dataset.act;
+  if(a==='home')return go(home);
+  if(a==='data')return go(dataView);
+  if(a==='p-all'){S.from=1;S.to=100;S.tags=[];S.feel=[];saveSettings();return home()}
+  if(a==='p-10'){S.from=1;S.to=10;S.tags=[];S.feel=[];saveSettings();return home()}
+  if(a==='p-koi'){S.from=1;S.to=100;S.tags=['恋'];S.feel=[];saveSettings();return home()}
+  if(a==='p-aki'){S.from=1;S.to=100;S.tags=['秋'];S.feel=[];saveSettings();return home()}
+  if(a==='g'||a==='f'){
+    var arr=a==='g'?S.tags:S.feel,g=t.dataset.g,i=arr.indexOf(g);
+    if(i>=0)arr.splice(i,1);else arr.push(g);
+    saveSettings();t.setAttribute('aria-pressed',i<0);return refreshCount();
+  }
+  if(a==='script'){S.script=t.dataset.s;saveSettings();return home()}
+  if(a==='start4'){var l=makeList();if(l.length&&data.length>=4)startQuiz('choice',l);return}
+  if(a==='startFill'){var l2=makeList();if(l2.length)startQuiz('fill',l2);return}
+  if(a==='quit')return go(home);
+  if(a==='pick')return pick(parseInt(t.dataset.k,10));
+  if(a==='wakatta')return wakatta();
+  if(a==='submit')return submitFill();
+  if(a==='next')return next();
+  if(a==='again')return startQuiz(Q.mode,makeList());
+  if(a==='retry')return startQuiz(Q.mode,shuffle(Q.missList));
+  if(a==='import'){
+    var r=parseImport(document.getElementById('importText').value);
+    if(r.err)return dataView(esc(r.err));
+    if(r.out.length<4)return dataView('読み込めた歌が'+r.out.length+'首でした。4首以上必要です。'+(r.errors.length?'<br>'+r.errors.slice(0,5).map(esc).join('<br>'):''));
+    data=r.out;lsSet('hyakunin_data_v1',JSON.stringify(data));
+    var mx=Math.max.apply(null,data.map(function(p){return p.no}));
+    S.from=1;S.to=Math.max(mx,10);S.tags=[];S.feel=[];saveSettings();
+    return dataView('<strong>'+data.length+'首を読み込みました。</strong>'+(r.errors.length?'<br>読み込めなかった行 '+r.errors.length+' 件<br>'+r.errors.slice(0,8).map(esc).join('<br>'):'')+(r.warns.length?'<br>確認が必要な項目 '+r.warns.length+' 件(読み込み自体は済んでいます)<br>'+r.warns.slice(0,8).map(esc).join('<br>'):''));
+  }
+  if(a==='resetdemo'){lsDel('hyakunin_data_v1');data=DEMO.slice();S.from=1;S.to=100;saveSettings();return dataView('テスト用の歌に戻しました。')}
+});
+$app.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.id==='from'||t.id==='to'){
+    var v=parseInt(t.value,10);
+    if(!isNaN(v)){S[t.id]=Math.min(100,Math.max(1,v));saveSettings();refreshCount()}
+  }else if(t.id==='speed'){S.speed=parseFloat(t.value);saveSettings();document.getElementById('speedv').textContent=S.speed.toFixed(1)}
+});
+$app.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='count'){S.count=t.value;saveSettings();return}
+  if(t.id==='csvFile'&&t.files&&t.files[0]){
+    t.files[0].arrayBuffer().then(function(buf){
+      var txt;
+      try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}
+      catch(err){try{txt=new TextDecoder('shift_jis').decode(buf)}catch(e2){txt=''}}
+      var ta=document.getElementById('importText');
+      if(ta)ta.value=txt;
+      var b=document.querySelector('[data-act="import"]');
+      if(b)b.click();
+    });
+  }
+});
+$app.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target.id==='ans'&&!e.isComposing){e.preventDefault();submitFill()}});
+
+/* 4択: after the result is shown, a tap anywhere moves on (short lock avoids the answering tap also advancing) */
+document.addEventListener('click',function(e){
+  if(!Q||!Q.active||Q.mode!=='choice'||Q.stage!=='done'||Date.now()<Q.nextOkAt)return;
+  var t=e.target.closest&&e.target.closest('[data-act]');
+  if(t&&(t.dataset.act==='next'||t.dataset.act==='quit'))return;
+  next();
+});
+
+home();
+})();
+</script>
