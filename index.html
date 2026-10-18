@@ -276,11 +276,11 @@ function loadData(){
 }
 function isDemo(){return data.length&&data[0].author==='デモ(オリジナル)'}
 function loadSettings(){
-  var d={from:1,to:100,tags:[],feel:[],speed:0.8,scriptK:'kana',scriptS:'kana',count:'all',kimari:true,pairHide:'kami',nsheet:[],kjlen:[],marks:[],fill4:true};
+  var d={from:1,to:100,tags:[],feel:[],speed:0.8,scriptK:'kana',scriptS:'kana',count:'all',kimari:true,pairHide:'kami',nsheet:[],kjlen:[],marks:[],fill4:true,confuse:true};
   var raw=lsGet('hyakunin_settings_v1');
   if(raw){try{var s=JSON.parse(raw);for(var k in d){if(s[k]!==undefined)d[k]=s[k]}
     if(s.script&&s.scriptK===undefined&&s.scriptS===undefined){d.scriptK=d.scriptS=(s.script==='kanji'?'kanji':'kana')}}catch(e){}}
-  d.fill4=d.fill4!==false;
+  d.fill4=d.fill4!==false;d.confuse=d.confuse!==false;
   d.marks=Array.isArray(d.marks)?d.marks.filter(function(x){return x>=1&&x<=4&&x===Math.floor(x)}):[];
   d.kjlen=Array.isArray(d.kjlen)?d.kjlen.filter(function(x){return typeof x==='number'&&isFinite(x)}):[];
   d.nsheet=Array.isArray(d.nsheet)?d.nsheet.filter(function(x){return typeof x==='number'&&isFinite(x)}):[];
@@ -409,6 +409,7 @@ function home(){
   h+='<div class="f">上の句の表記<div class="row"><button class="chip" data-act="script" data-p="kami" data-s="kana" aria-pressed="'+(S.scriptK==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-p="kami" data-s="kanji" aria-pressed="'+(S.scriptK==='kanji')+'">漢字まじり</button></div></div>'+
     '<div class="f">下の句の表記<div class="row"><button class="chip" data-act="script" data-p="shimo" data-s="kana" aria-pressed="'+(S.scriptS==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-p="shimo" data-s="kanji" aria-pressed="'+(S.scriptS==='kanji')+'">漢字まじり</button></div></div>'+
     '<div class="f">決まり字で止める<div class="row"><button class="chip" data-act="kimari" data-v="1" aria-pressed="'+S.kimari+'">オン</button><button class="chip" data-act="kimari" data-v="0" aria-pressed="'+(!S.kimari)+'">オフ</button></div></div>'+
+    '<div class="f">4択: 似た札を混ぜる<div class="row"><button class="chip" data-act="confuse" data-v="1" aria-pressed="'+(S.confuse!==false)+'">オン</button><button class="chip" data-act="confuse" data-v="0" aria-pressed="'+(S.confuse===false)+'">オフ</button></div></div>'+
     '<div class="f">穴埋め: 四句だけでも正解<div class="row"><button class="chip" data-act="fill4" data-v="1" aria-pressed="'+(S.fill4!==false)+'">オン</button><button class="chip" data-act="fill4" data-v="0" aria-pressed="'+(S.fill4===false)+'">オフ</button></div></div></div>'+
     '<p class="note" style="margin:10px 0 0">'+(S.kimari?'上の句を決まり字まで表示して一度止まります。分からないときは「わからない」で続きを表示します。':'上の句が最後まで1文字ずつ表示されます。穴埋めは「わかった」で止めて答えます。')+'</p></section>';
   h+='</div>';
@@ -583,6 +584,17 @@ function kimariji(p){
 function kimarijiText(p){return moras(squash(p.kamiKana)).slice(0,kimariji(p)).join('')}
 
 /* ---------- quiz ---------- */
+/* 4択の選択肢: 上の句や下の句の出だしが同じ歌(紛らわしい札)を優先して混ぜる */
+function lcpMoras(a,b){var x=moras(squash(a)),y=moras(squash(b)),n=0;while(n<x.length&&n<y.length&&x[n]===y[n])n++;return n}
+function pickDistractors(p){
+  var rest=shuffle(data.filter(function(x){return x.no!==p.no}));
+  if(S.confuse===false)return rest.slice(0,3);
+  var scored=rest.map(function(x){return {x:x,sc:Math.max(lcpMoras(p.kamiKana,x.kamiKana),lcpMoras(p.shimoKana,x.shimoKana))}});
+  var sim=scored.filter(function(o){return o.sc>=2}).sort(function(a,b){return b.sc-a.sc}).slice(0,2).map(function(o){return o.x});
+  var out=sim.slice();
+  rest.forEach(function(x){if(out.length<3&&out.indexOf(x)<0)out.push(x)});
+  return out;
+}
 function startQuiz(mode,list){
   stopTimer();
   Q={mode:mode,list:list,i:0,recs:[],answered:false,rev:0,total:0,opts:null,stage:'ask',active:true,nextOkAt:0,more:false,gaveUp:false,pauseAt:0,kim:0,tick:null,kimari:S.kimari!==false};
@@ -606,7 +618,7 @@ function showQ(){
   var h='<div class="prog"><span class="num">'+(Q.i+1)+' / '+Q.list.length+'</span><div class="bar"><i style="width:'+(Q.i/Q.list.length*100)+'%"></i></div><button class="btn small" data-act="quit">やめる</button></div>';
   h+='<div class="kami" id="kami">'+vertHTML(kp,true)+'</div>';
   if(Q.mode==='choice'){
-    var others=shuffle(data.filter(function(x){return x.no!==p.no})).slice(0,3);
+    var others=pickDistractors(p);
     Q.opts=shuffle([p].concat(others));
     h+='<div class="opts" id="opts">'+Q.opts.map(function(o,k){
       return '<button class="opt" data-act="pick" data-k="'+k+'" aria-label="選択肢'+(k+1)+'">'+vertHTML(phrases(o,'shimo'),false)+'</button>';
@@ -922,6 +934,7 @@ $app.addEventListener('click',function(e){
     if(i>=0)arr.splice(i,1);else arr.push(g);
     saveSettings();t.setAttribute('aria-pressed',i<0);return refreshCount();
   }
+  if(a==='confuse'){S.confuse=t.dataset.v==='1';saveSettings();return home()}
   if(a==='fill4'){S.fill4=t.dataset.v==='1';saveSettings();return home()}
   if(a==='mark'){
     var mno=parseInt(t.dataset.no,10),mid=parseInt(t.dataset.m,10);
