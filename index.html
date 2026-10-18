@@ -697,13 +697,23 @@ function enterInput(manual){
     (manual?'':'<p class="note" id="pnote" style="margin:0">'+(all?'上の句をすべて表示しました。':'決まり字まで表示しました。')+'</p>')+
     '<label class="f" for="ans">下の句をひらがなで入力'+(S.fill4!==false?'(四句だけでも正解)':'')+'</label>'+
     '<div class="ansrow"><input type="text" id="ans" lang="ja" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ひらがな"><button class="btn primary" data-act="submit">答える</button></div>'+
-    (manual?'':'<button class="btn" style="width:100%" data-act="'+(all?'giveup':'dontknow')+'" id="dkBtn">'+(all?'降参して答えを見る':'わからない(続きを表示)')+'</button>')+
+    (manual?(all?'':'<button class="btn" style="width:100%" data-act="cancelans">キャンセルして続きを表示</button>'):'<button class="btn" style="width:100%" data-act="'+(all?'giveup':'dontknow')+'" id="dkBtn">'+(all?'降参して答えを見る':'わからない(続きを表示)')+'</button>')+
     '<p class="note" style="margin:0">「は」と「わ」、「へ」と「え」など同じ音は区別せずに判定します。</p></div>';
   var a=document.getElementById('ans');if(a)a.focus({preventScroll:true});
 }
 function wakatta(){
   if(Q.stage!=='ask'||Q.kimari)return;
   enterInput(true);
+}
+/* 「わかった」を取り消して、残りの字の表示を再開する */
+function cancelAnswer(){
+  if(Q.stage!=='input'||Q.mode!=='fill'||Q.kimari||Q.rev>=Q.total)return;
+  Q.stage='ask';
+  var fb=document.getElementById('fb');
+  if(fb)fb.innerHTML='<button class="btn primary big" data-act="wakatta">わかった</button>';
+  stopTimer();
+  timer=setInterval(Q.tick,Math.max(100,S.speed*1000));
+  Q.tick();
 }
 function dontknow(){
   if(Q.stage!=='input'&&Q.stage!=='paused')return;
@@ -934,6 +944,7 @@ $app.addEventListener('click',function(e){
   if(a==='quit'){P=null;return go(home)}
   if(a==='pick')return pick(parseInt(t.dataset.k,10));
   if(a==='wakatta')return wakatta();
+  if(a==='cancelans')return cancelAnswer();
   if(a==='kimari'){S.kimari=t.dataset.v==='1';saveSettings();return home()}
   if(a==='dontknow')return dontknow();
   if(a==='giveup')return giveUp();
