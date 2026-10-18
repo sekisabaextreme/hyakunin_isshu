@@ -67,15 +67,16 @@ textarea{width:100%;min-height:150px;font-size:16px}
 .modes .btn small{display:block;font-weight:400;font-size:12px;opacity:.85}
 /* vertical poem */
 .vert{writing-mode:vertical-rl;text-orientation:upright;font-family:var(--serif);letter-spacing:.08em;line-height:1.5}
-.vert .ph{margin-left:.7em}
+.vert{font-size:calc(var(--F,16px)*var(--sc,1));height:calc(var(--F,16px)*var(--H,9.3))}
+.vert .ph{margin-left:.7em;padding-top:calc(1em*var(--o,0));white-space:nowrap}
 .kami{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 10px;display:flex;justify-content:center;align-items:flex-start}
-.kami .vert{font-size:var(--kfs);font-weight:500;min-height:8em}
+.kami{--F:var(--kfs)}.kami .vert{font-weight:500}
 .c{opacity:0;visibility:hidden;transition:opacity .2s}
 .c.on{opacity:1;visibility:visible}
 .c.late{opacity:.5;color:var(--late)}
 .opts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.opt{font:inherit;background:var(--paper);color:var(--ink);border:1.5px solid var(--line);border-radius:8px;padding:12px 4px;cursor:pointer;display:flex;justify-content:center;align-items:flex-start;min-height:calc(var(--ofs)*7.8 + 28px)}
-.opt .vert{font-size:var(--ofs)}
+.opt{font:inherit;background:var(--paper);color:var(--ink);border:1.5px solid var(--line);border-radius:8px;padding:12px 4px;cursor:pointer;display:flex;justify-content:center;align-items:flex-start;min-height:calc(var(--ofs)*9.3 + 28px)}
+.opt{--F:var(--ofs)}
 .opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--paper))}
 .opt.wrong{border-color:var(--ng);background:color-mix(in srgb,var(--ng) 14%,var(--paper))}
 .opt[aria-disabled="true"]{cursor:pointer}
@@ -149,10 +150,29 @@ ul{margin:0;padding:0}
   main.quiz{row-gap:8px}
   .card{padding:12px}
   .kami{padding:12px 8px}
-  .kami .vert{min-height:7em}
   .btn.big{padding:12px}
   .poemfull .j{font-size:15px}
 }
+
+/* pair mode */
+main.pairview{max-width:720px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:10px}
+.pcol h3{font-size:13px;margin:0 0 6px;color:var(--muted);font-weight:600;text-align:center}
+.pcol{display:flex;flex-direction:column;gap:8px}
+.pc{font:inherit;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:10px 4px;cursor:pointer;display:flex;justify-content:center;align-items:flex-start;min-height:calc(var(--pfs)*9.3 + 24px);height:calc(var(--pfs)*9.3 + 24px);width:100%;position:relative}
+.pc{--F:var(--pfs)}.pc .vert{line-height:1.3;letter-spacing:.02em}
+.pc.down{background:repeating-linear-gradient(45deg,var(--surface),var(--surface) 8px,var(--line) 8px,var(--line) 9px);align-items:center;color:var(--muted)}
+.pc.down .back{font-size:13px;letter-spacing:.1em}
+.pc.empty{visibility:hidden;cursor:default}
+.pc.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.pc.done{opacity:.45;cursor:default;border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--paper))}
+.pc.bad{border-color:var(--ng);background:color-mix(in srgb,var(--ng) 14%,var(--paper));animation:pshake .3s}
+.pc.flip{animation:pflip .25s}
+@keyframes pflip{from{transform:rotateY(90deg)}to{transform:none}}
+@keyframes pshake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+:root{--pfs:clamp(13px,min(4vw,3vh),22px)}
+@media (min-width:760px){:root{--pfs:min(26px,3.6vh)}}
+@media (prefers-reduced-motion: reduce){.pc.flip,.pc.bad{animation:none}}
 @media (prefers-reduced-motion: reduce){.c{transition:none}}
 
 </style>
@@ -242,9 +262,13 @@ function loadData(){
 }
 function isDemo(){return data.length&&data[0].author==='デモ(オリジナル)'}
 function loadSettings(){
-  var d={from:1,to:100,tags:[],feel:[],speed:0.8,script:'kana',count:'all'};
+  var d={from:1,to:100,tags:[],feel:[],speed:0.8,scriptK:'kana',scriptS:'kana',count:'all',kimari:true,pairHide:'kami',nsheet:[],kjlen:[]};
   var raw=lsGet('hyakunin_settings_v1');
-  if(raw){try{var s=JSON.parse(raw);for(var k in d){if(s[k]!==undefined)d[k]=s[k]}}catch(e){}}
+  if(raw){try{var s=JSON.parse(raw);for(var k in d){if(s[k]!==undefined)d[k]=s[k]}
+    if(s.script&&s.scriptK===undefined&&s.scriptS===undefined){d.scriptK=d.scriptS=(s.script==='kanji'?'kanji':'kana')}}catch(e){}}
+  d.kjlen=Array.isArray(d.kjlen)?d.kjlen.filter(function(x){return typeof x==='number'&&isFinite(x)}):[];
+  d.nsheet=Array.isArray(d.nsheet)?d.nsheet.filter(function(x){return typeof x==='number'&&isFinite(x)}):[];
+  d.scriptK=d.scriptK==='kanji'?'kanji':'kana';d.scriptS=d.scriptS==='kanji'?'kanji':'kana';
   return d;
 }
 function saveSettings(){lsSet('hyakunin_settings_v1',JSON.stringify(S))}
@@ -271,8 +295,9 @@ function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(M
 /* phrases(p,'kami') -> array of arrays of display units */
 function phrases(p,part){
   var lens=part==='kami'?[5,7,5]:[7,7];
-  var t=S.script==='kanji'?p[part]:p[part+'Kana'];
-  if(S.script==='kanji'&&!/[\s　]/.test(t))t=p[part+'Kana'];
+  var kj=(part==='kami'?S.scriptK:S.scriptS)==='kanji';
+  var t=kj?p[part]:p[part+'Kana'];
+  if(kj&&!/[\s　]/.test(t))t=p[part+'Kana'];
   var useMora=(t===p[part+'Kana']);
   var parts;
   if(/[\s　]/.test(t.trim())){
@@ -280,6 +305,7 @@ function phrases(p,part){
   }else{
     var u=moras(t),sum=lens.reduce(function(a,b){return a+b},0);
     if(u.length===sum){parts=[];var pos=0;lens.forEach(function(n){parts.push(u.slice(pos,pos+n).join(''));pos+=n})}
+    else if(u.length>lens[0]){parts=[];var pos2=0,cum=0;lens.forEach(function(n,k){cum+=n;var end=k===lens.length-1?u.length:Math.round(cum*u.length/sum);parts.push(u.slice(pos2,end).join(''));pos2=end})}
     else parts=[t];
   }
   return parts.map(function(ph){return useMora?moras(ph):Array.from(ph)});
@@ -288,10 +314,23 @@ function plainText(p,part,kana){
   var t=kana?p[part+'Kana']:p[part];
   return t.trim().replace(/[\s　]+/g,' ');
 }
+var GS=1,GSkey=null,GSdata=null;
+/* 全部の歌で字の大きさをそろえる: いちばん字余りの句に合わせた共通の倍率 */
+function globalScale(){
+  var key=S.scriptK+'|'+S.scriptS;
+  if(GSdata!==data||GSkey!==key){
+    var mx=8;
+    data.forEach(function(p){['kami','shimo'].forEach(function(part){
+      var tot=0;phrases(p,part).forEach(function(l,k){tot=Math.max(tot,k+l.length)});mx=Math.max(mx,tot);
+    })});
+    GS=8/mx;GSdata=data;GSkey=key;
+  }
+  return GS;
+}
 function vertHTML(ph,withSpans){
-  var i=0;
-  return '<div class="vert">'+ph.map(function(line){
-    return '<div class="ph">'+line.map(function(c){
+  var i=0,sc=globalScale();
+  return '<div class="vert" style="--sc:'+sc.toFixed(3)+'">'+ph.map(function(line,k){
+    return '<div class="ph" style="--o:'+k+'">'+line.map(function(c){
       return withSpans?'<span class="c" data-i="'+(i++)+'">'+esc(c)+'</span>':esc(c);
     }).join('')+'</div>';
   }).join('')+'</div>';
@@ -299,9 +338,20 @@ function vertHTML(ph,withSpans){
 function unitCount(ph){return ph.reduce(function(a,l){return a+l.length},0)}
 
 /* ---------- selection ---------- */
+var GI=null,GIdata=null;
+function firstKana(p){return toHira(String(p.kamiKana).trim()).charAt(0)}
+function groupInfo(){
+  if(GIdata!==data){
+    var by={};data.forEach(function(p){var k=firstKana(p);by[k]=(by[k]||0)+1});
+    var sizes={};Object.keys(by).forEach(function(k){(sizes[by[k]]=sizes[by[k]]||[]).push(k)});
+    GI={by:by,sizes:sizes};GIdata=data;
+  }
+  return GI;
+}
 function pool(){
+  var gi=groupInfo();
   var anyOf=function(have,want){return !want.length||have.some(function(x){return want.indexOf(x)>=0})};
-  return data.filter(function(p){return p.no>=S.from&&p.no<=S.to&&anyOf(p.genres,S.tags)&&anyOf(p.feelings,S.feel)});
+  return data.filter(function(p){return p.no>=S.from&&p.no<=S.to&&anyOf(p.genres,S.tags)&&anyOf(p.feelings,S.feel)&&(!S.nsheet.length||S.nsheet.indexOf(gi.by[firstKana(p)])>=0)&&(!S.kjlen.length||S.kjlen.indexOf(kimariji(p))>=0)});
 }
 
 /* ---------- views ---------- */
@@ -326,14 +376,28 @@ function home(){
     GENRE_GROUPS.map(function(gr){return '<div class="grp"><span class="gname">'+gr.k+'. '+esc(gr.name)+'</span><div class="row">'+gr.tags.map(function(g){return chipHTML('g',g,S.tags)}).join('')+'</div></div>'}).join('')+'</details>';
   h+='<details class="fold"'+(S.feel.length?' open':'')+'><summary>気持ちで絞る <span class="num count" id="feeln">'+(S.feel.length?S.feel.length+'件選択中':'')+'</span></summary><div class="row" style="margin-top:8px">'+
     EMOTIONS.map(function(g){return chipHTML('f',g,S.feel)}).join('')+'</div></details>';
+  var gi=groupInfo(),ns=Object.keys(gi.sizes).map(Number).sort(function(a,b){return a-b});
+  h+='<details class="fold"'+(S.nsheet.length?' open':'')+'><summary>はじめの1文字(枚数)で絞る <span class="num count" id="nsn">'+(S.nsheet.length?S.nsheet.length+'件選択中':'')+'</span></summary><p class="note" style="margin:8px 0 0">初句のはじめの1文字が同じ歌のグループです。たとえば「む」で始まる歌が1首だけなら1枚札です。</p>'+
+    ns.map(function(n){return '<div class="grp"><span class="gname">'+n+'枚札('+gi.sizes[n].join('・')+')</span><div class="row"><button class="chip" data-act="ns" data-n="'+n+'" aria-pressed="'+(S.nsheet.indexOf(n)>=0)+'">'+n+'枚札 '+(n*gi.sizes[n].length)+'首</button></div></div>'}).join('')+'</details>';
+  var kg={};data.forEach(function(p){var n=kimariji(p);(kg[n]=kg[n]||[]).push(p)});
+  var kns=Object.keys(kg).map(Number).sort(function(a,b){return a-b});
+  h+='<details class="fold"'+(S.kjlen.length?' open':'')+'><summary>決まり字の長さで絞る <span class="num count" id="kjn">'+(S.kjlen.length?S.kjlen.length+'件選択中':'')+'</span></summary><p class="note" style="margin:8px 0 0">決まり字(札を取れるまでの最短の文字数)が同じ歌のグループです。'+(data.length<100?'読み込んだ歌が100首未満のあいだは、本来より短くなります。':'')+'</p>'+
+    kns.map(function(n){return '<div class="grp"><span class="gname">'+n+'字決まり '+kg[n].length+'首</span><div class="row"><button class="chip" data-act="kj" data-n="'+n+'" aria-pressed="'+(S.kjlen.indexOf(n)>=0)+'">'+n+'字決まり</button><span class="note" style="margin:0">'+kg[n].slice(0,12).map(function(p){return esc(kimarijiText(p))}).join('・')+(kg[n].length>12?'…':'')+'</span></div></div>'}).join('')+'</details>';
   h+='<p class="note" style="margin:10px 0 0">対象 <span class="count num" id="cnt">'+n+'</span> 首</p></section>';
   h+='<section class="card"><h2>設定</h2>';
   h+='<label class="f" for="speed"><span>上の句の表示速度 <span class="num" id="speedv">'+S.speed.toFixed(1)+'</span> 秒 / 1文字</span></label><input type="range" id="speed" min="0.2" max="2" step="0.1" value="'+S.speed+'">';
   h+='<div class="row" style="margin-top:12px;align-items:flex-start"><label class="f" for="count">出題数<select id="count">'+['10','20','50','all'].map(function(v){return '<option value="'+v+'"'+(String(S.count)===v?' selected':'')+'>'+(v==='all'?'全部':v+'問')+'</option>'}).join('')+'</select></label>';
-  h+='<div class="f">表記<div class="row"><button class="chip" data-act="script" data-s="kana" aria-pressed="'+(S.script==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-s="kanji" aria-pressed="'+(S.script==='kanji')+'">漢字まじり</button></div></div></div></section>';
+  h+='<div class="f">上の句の表記<div class="row"><button class="chip" data-act="script" data-p="kami" data-s="kana" aria-pressed="'+(S.scriptK==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-p="kami" data-s="kanji" aria-pressed="'+(S.scriptK==='kanji')+'">漢字まじり</button></div></div>'+
+    '<div class="f">下の句の表記<div class="row"><button class="chip" data-act="script" data-p="shimo" data-s="kana" aria-pressed="'+(S.scriptS==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-p="shimo" data-s="kanji" aria-pressed="'+(S.scriptS==='kanji')+'">漢字まじり</button></div></div>'+
+    '<div class="f">決まり字で止める<div class="row"><button class="chip" data-act="kimari" data-v="1" aria-pressed="'+S.kimari+'">オン</button><button class="chip" data-act="kimari" data-v="0" aria-pressed="'+(!S.kimari)+'">オフ</button></div></div></div>'+
+    '<p class="note" style="margin:10px 0 0">'+(S.kimari?'上の句を決まり字まで表示して一度止まります。分からないときは「わからない」で続きを表示します。':'上の句が最後まで1文字ずつ表示されます。穴埋めは「わかった」で止めて答えます。')+'</p></section>';
   h+='</div>';
-  h+='<section class="modes"><button class="btn primary big" data-act="start4"'+(n?'':' disabled')+'>4択トレーニング<small>上の句が1文字ずつ出る。下の句を4つから選ぶ</small></button>';
-  h+='<button class="btn primary big" data-act="startFill"'+(n?'':' disabled')+'>穴埋めトレーニング<small>「わかった」で止めて、下の句を打ち込む</small></button></section>';
+  if(data.length<100&&S.kimari)h+='<p class="note" style="margin:0">いま読み込んでいるのは'+data.length+'首です。決まり字は読み込んだ歌のなかで判定するので、100首そろうまでは本来より短くなります。</p>';
+  h+='<section class="modes"><button class="btn primary big" data-act="start4"'+(n?'':' disabled')+'>4択トレーニング<small>'+(S.kimari?'決まり字まで表示して止まる。下の句を4つから選ぶ':'上の句が1文字ずつ出る。下の句を4つから選ぶ')+'</small></button>';
+  h+='<button class="btn primary big" data-act="startFill"'+(n?'':' disabled')+'>穴埋めトレーニング<small>'+(S.kimari?'決まり字まで表示して止まる。下の句を打ち込む':'「わかった」で止めて、下の句を打ち込む')+'</small></button></section>';
+  h+='<section class="card"><h2>ペアトレーニング</h2><p class="note" style="margin:0 0 8px">上の句4枚と下の句4枚から、正しい組を作ります。つなげると次の札が出ます。</p>';
+  h+='<div class="f" style="margin-top:10px">伏せる札<div class="row"><button class="chip" data-act="pairhide" data-v="kami" aria-pressed="'+(S.pairHide!=='shimo')+'">上の句を伏せる(下の句が表)</button><button class="chip" data-act="pairhide" data-v="shimo" aria-pressed="'+(S.pairHide==='shimo')+'">下の句を伏せる(上の句が表)</button></div></div>';
+  h+='<div class="modes" style="margin-top:12px"><button class="btn primary big" data-act="startPair"'+(n>=2?'':' disabled')+'>ペアトレーニングを始める<small>伏せた札はタップでめくれる。出題数は設定の「出題数」に従う</small></button></div></section>';
   h+='<div class="row"><button class="btn small" data-act="data">歌データの管理</button><span class="note">収録 <span class="num">'+data.length+'</span> 首</span></div>';
   $app.innerHTML=h;
 }
@@ -477,10 +541,31 @@ function parseImport(text){
   return {out:out,errors:errors,warns:warns};
 }
 
+/* ---------- kimariji: shortest opening that no other loaded poem shares ---------- */
+var KC=null,KCdata=null;
+function kimariji(p){
+  if(KCdata!==data){
+    KC={};
+    var arr=data.map(function(q){return {no:q.no,m:moras(squash(q.kamiKana))}});
+    arr.forEach(function(a){
+      var k=a.m.length;
+      for(var n=1;n<=a.m.length;n++){
+        var pre=a.m.slice(0,n).join('');
+        var clash=arr.some(function(b){return b.no!==a.no&&b.m.length>=n&&b.m.slice(0,n).join('')===pre});
+        if(!clash){k=n;break}
+      }
+      KC[a.no]=k;
+    });
+    KCdata=data;
+  }
+  return KC[p.no]||moras(squash(p.kamiKana)).length;
+}
+function kimarijiText(p){return moras(squash(p.kamiKana)).slice(0,kimariji(p)).join('')}
+
 /* ---------- quiz ---------- */
 function startQuiz(mode,list){
   stopTimer();
-  Q={mode:mode,list:list,i:0,recs:[],answered:false,rev:0,total:0,opts:null,stage:'ask',active:true,nextOkAt:0};
+  Q={mode:mode,list:list,i:0,recs:[],answered:false,rev:0,total:0,opts:null,stage:'ask',active:true,nextOkAt:0,more:false,gaveUp:false,pauseAt:0,kim:0,tick:null,kimari:S.kimari!==false};
   showQ();
 }
 function makeList(){
@@ -492,7 +577,12 @@ function showQ(){
   $app.className='quiz';
   var p=Q.list[Q.i];
   var kp=phrases(p,'kami');
-  Q.total=unitCount(kp);Q.rev=0;Q.answered=false;Q.stage='ask';
+  Q.total=unitCount(kp);Q.rev=0;Q.answered=false;Q.stage='ask';Q.more=false;Q.gaveUp=false;
+  Q.kim=kimariji(p);
+  /* where the poem pauses. Kana display: exactly the kimariji. Kanji display: kana count cannot be mapped one-to-one, so scale proportionally and round up */
+  var dispKana=kp.map(function(l){return l.join('')}).join('')===squash(p.kamiKana);
+  var kanaLen=Math.max(1,moras(squash(p.kamiKana)).length);
+  Q.pauseAt=Q.kimari?Math.max(1,Math.min(Q.total,dispKana?Q.kim:Math.ceil(Q.kim/kanaLen*Q.total))):Q.total;
   var h='<div class="prog"><span class="num">'+(Q.i+1)+' / '+Q.list.length+'</span><div class="bar"><i style="width:'+(Q.i/Q.list.length*100)+'%"></i></div><button class="btn small" data-act="quit">やめる</button></div>';
   h+='<div class="kami" id="kami">'+vertHTML(kp,true)+'</div>';
   if(Q.mode==='choice'){
@@ -503,18 +593,24 @@ function showQ(){
     }).join('')+'</div>';
     h+='<div id="fb"></div>';
   }else{
-    h+='<div id="fb"><button class="btn primary big" data-act="wakatta">わかった</button></div>';
+    h+=Q.kimari?'<div id="fb"><p class="note" style="margin:0;text-align:center">決まり字まで表示します</p></div>':'<div id="fb"><button class="btn primary big" data-act="wakatta">わかった</button></div>';
   }
   $app.innerHTML=h;
   var tick=function(){
-    if(Q.rev<Q.total){
+    if(Q.stage==='input'||Q.stage==='paused'||Q.stage==='done'){stopTimer();return}
+    var limit=(Q.kimari&&Q.stage==='ask')?Q.pauseAt:Q.total;
+    if(Q.rev<limit){
       var el=document.querySelector('.c[data-i="'+Q.rev+'"]');
       if(el)el.classList.add('on');
       Q.rev++;
     }
-    if(Q.rev>=Q.total)stopTimer();
+    if(Q.rev>=limit){
+      stopTimer();
+      if(Q.kimari&&Q.stage==='ask')enterPause();
+    }
   };
-  setTimeout(function(){if(Q&&!Q.answered&&Q.stage==='ask'&&!timer){tick();timer=setInterval(tick,Math.max(100,S.speed*1000))}},350);
+  Q.tick=tick;
+  setTimeout(function(){if(Q&&!Q.answered&&Q.stage==='ask'&&!timer){timer=setInterval(tick,Math.max(100,S.speed*1000));tick()}},350);
 }
 function freezeKami(keepHidden){
   stopTimer();
@@ -529,12 +625,22 @@ function fullPoem(p){
   return '<div class="poemfull"><div class="j">'+esc(plainText(p,'kami',false))+'</div><div class="j">'+esc(plainText(p,'shimo',false))+'</div>'+
     '<div class="r">'+esc(plainText(p,'kami',true))+' / '+esc(plainText(p,'shimo',true))+'</div>'+
     '<div class="a">'+(isDemo()?'':'<span class="num">'+p.no+'</span>番　')+esc(p.author)+'</div>'+
+    '<div class="note">決まり字: <strong style="color:var(--ink)">'+esc(kimarijiText(p))+'</strong>('+kimariji(p)+'文字)'+(data.length<100?'　※読み込んだ歌のなかでの判定':'')+'</div>'+
     ((p.genres.length||p.feelings.length)?'<div class="note">'+(p.genres.length?'ジャンル: '+esc(p.genres.join('・')):'')+(p.genres.length&&p.feelings.length?'　':'')+(p.feelings.length?'気持ち: '+esc(p.feelings.join('・')):'')+'</div>':'')+'</div>';
 }
 function feedback(ok,extra){
   var p=Q.list[Q.i],last=Q.i>=Q.list.length-1;
-  var shown=Q.rev===0?'1文字も出る前':(Q.rev>=Q.total?'最後まで見て':Q.rev+'文字目で');
-  var h='<div class="card fb"><div class="row"><span class="mark '+(ok?'ok':'ng')+'" aria-hidden="true">'+(ok?'○':'×')+'</span><div><strong>'+(ok?'正解':'不正解')+'</strong><div class="note">'+shown+(Q.mode==='choice'?'答えた':'止めた')+'</div></div></div>'+(extra||'')+fullPoem(p)+(Q.mode==='choice'?'<p class="note" style="margin:0;text-align:center">画面のどこかをタップすると次へ進みます</p>':'')+
+  var shown;
+  var upto=Q.rev===0?'1文字も出る前':(Q.rev>=Q.total?'最後まで見て':Q.rev+'文字目で');
+  if(Q.gaveUp)shown='「わからない」を選びました';
+  else if(Q.kimari){
+    if(Q.more)shown='決まり字のあと、'+upto+'答えた';
+    else if(Q.rev<Q.pauseAt)shown=upto+'答えた(決まり字より前)';
+    else shown='決まり字までで答えた';
+  }else{
+    shown=upto+(Q.mode==='choice'?'答えた':'止めた');
+  }
+  var h='<div class="card fb"><div class="row"><span class="mark '+(ok?'ok':'ng')+'" aria-hidden="true">'+(ok?'○':'×')+'</span><div><strong>'+(ok?'正解':'不正解')+'</strong><div class="note">'+shown+'</div></div></div>'+(extra||'')+fullPoem(p)+(Q.mode==='choice'?'<p class="note" style="margin:0;text-align:center">画面のどこかをタップすると次へ進みます</p>':'')+
     '<button class="btn primary big" data-act="next" id="nextBtn">'+(last?'結果を見る':'次の歌へ')+'</button></div>';
   document.getElementById('fb').innerHTML=h;
   var nb=document.getElementById('nextBtn');if(nb)nb.focus({preventScroll:true});
@@ -551,25 +657,68 @@ function pick(k){
     if(Q.opts[i].no===p.no)b.classList.add('correct');
     else if(i===k)b.classList.add('wrong');
   });
-  Q.recs.push({p:p,ok:ok,shown:Q.rev});
+  Q.recs.push({p:p,ok:ok,shown:Q.rev,more:Q.more});
   feedback(ok);
 }
-function wakatta(){
+function enterPause(){
+  if(Q.stage!=='ask')return;
+  if(Q.mode==='fill'){enterInput(false);return}
+  Q.stage='paused';
+  var all=Q.rev>=Q.total;
+  document.getElementById('fb').innerHTML='<div class="card fb"><p class="note" id="pnote" style="margin:0">'+(all?'上の句をすべて表示しました。':'決まり字まで表示しました。')+'分かったら、下の句の選択肢をタップしてください。</p>'+
+    (all?'':'<button class="btn" style="width:100%" data-act="dontknow" id="dkBtn">わからない(続きを表示)</button>')+'</div>';
+}
+function enterInput(manual){
   if(Q.stage!=='ask')return;
   Q.stage='input';
-  freezeKami(true);
-  document.getElementById('fb').innerHTML='<div class="card fb"><label class="f" for="ans">下の句をひらがなで入力</label><div class="ansrow"><input type="text" id="ans" lang="ja" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ひらがな"><button class="btn primary" data-act="submit">答える</button></div><p class="note" style="margin:0">「は」と「わ」、「へ」と「え」など同じ音は区別せずに判定します。</p></div>';
-  var a=document.getElementById('ans');if(a)a.focus();
+  if(manual)freezeKami(true); /* 「わかった」: stop now and keep the rest hidden */
+  var all=Q.rev>=Q.total;
+  document.getElementById('fb').innerHTML='<div class="card fb">'+
+    (manual?'':'<p class="note" id="pnote" style="margin:0">'+(all?'上の句をすべて表示しました。':'決まり字まで表示しました。')+'</p>')+
+    '<label class="f" for="ans">下の句をひらがなで入力</label>'+
+    '<div class="ansrow"><input type="text" id="ans" lang="ja" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ひらがな"><button class="btn primary" data-act="submit">答える</button></div>'+
+    (manual?'':'<button class="btn" style="width:100%" data-act="'+(all?'giveup':'dontknow')+'" id="dkBtn">'+(all?'降参して答えを見る':'わからない(続きを表示)')+'</button>')+
+    '<p class="note" style="margin:0">「は」と「わ」、「へ」と「え」など同じ音は区別せずに判定します。</p></div>';
+  var a=document.getElementById('ans');if(a)a.focus({preventScroll:true});
+}
+function wakatta(){
+  if(Q.stage!=='ask'||Q.kimari)return;
+  enterInput(true);
+}
+function dontknow(){
+  if(Q.stage!=='input'&&Q.stage!=='paused')return;
+  if(Q.stage==='input'&&Q.rev>=Q.total)return giveUp();
+  var choice=Q.mode==='choice';
+  Q.stage='more';Q.more=true;
+  var b=document.getElementById('dkBtn'),pn=document.getElementById('pnote');
+  if(choice){
+    if(b)b.remove();
+    if(pn)pn.textContent='続きを表示しています。分かったら、下の句の選択肢をタップしてください。';
+  }else{
+    if(b){b.setAttribute('data-act','giveup');b.textContent='降参して答えを見る'}
+    if(pn)pn.textContent='続きを表示しています。分かったら、いつでも入力して答えられます。';
+  }
+  stopTimer();
+  timer=setInterval(Q.tick,Math.max(100,S.speed*1000));
+  Q.tick();
+}
+function giveUp(){
+  if(Q.stage!=='input'&&Q.stage!=='more')return;
+  Q.stage='done';Q.answered=true;Q.gaveUp=true;
+  freezeKami(false);
+  var p=Q.list[Q.i];
+  Q.recs.push({p:p,ok:false,shown:Q.rev,more:Q.more,gaveUp:true});
+  feedback(false);
 }
 function submitFill(){
-  if(Q.stage!=='input')return;
+  if(Q.stage!=='input'&&Q.stage!=='more')return;
   var v=document.getElementById('ans').value;
   if(!v.trim())return;
   Q.stage='done';Q.answered=true;
   freezeKami(false);
   var p=Q.list[Q.i];
   var ok=norm(v)===norm(p.shimoKana)||v.replace(/[\s　]/g,'')===p.shimo.replace(/[\s　]/g,'');
-  Q.recs.push({p:p,ok:ok,shown:Q.rev,given:v});
+  Q.recs.push({p:p,ok:ok,shown:Q.rev,given:v,more:Q.more});
   feedback(ok,'<div class="note">あなたの答え: <strong style="color:var(--ink)">'+esc(v)+'</strong></div>');
 }
 function next(){
@@ -584,8 +733,8 @@ function result(){
   var avg=okRecs.length?(okRecs.reduce(function(a,r){return a+r.shown},0)/okRecs.length):null;
   var miss=Q.recs.filter(function(r){return !r.ok});
   var h='<header><h1>結果</h1><p class="sub">'+(Q.mode==='choice'?'4択トレーニング':'穴埋めトレーニング')+'</p></header>';
-  h+='<section class="card"><div class="big-score num">'+ok+' <span style="font-size:22px">/ '+n+'</span></div><p class="note" style="margin:6px 0 0">正答率 <span class="num">'+(n?Math.round(ok/n*100):0)+'</span>%'+(avg!==null?'　正解した歌の平均は <span class="num">'+avg.toFixed(1)+'</span> 文字目':'')+'</p>';
-  h+='<p class="note" style="margin:4px 0 0">平均の文字数が少ないほど、早く決まり字に気づけています。</p></section>';
+  h+='<section class="card"><div class="big-score num">'+ok+' <span style="font-size:22px">/ '+n+'</span></div><p class="note" style="margin:6px 0 0">正答率 <span class="num">'+(n?Math.round(ok/n*100):0)+'</span>%'+(Q.kimari?'　決まり字までで正解 <span class="num">'+Q.recs.filter(function(r){return r.ok&&!r.more}).length+'</span> 首':(avg!==null?'　正解した歌の平均は <span class="num">'+avg.toFixed(1)+'</span> 文字目':''))+'</p>';
+  h+='<p class="note" style="margin:4px 0 0">'+(Q.kimari?'「わからない」を使わずに決まり字までで答えられた歌が多いほど、札を取る力がついています。':'平均の文字数が少ないほど、早く決まり字に気づけています。')+'</p></section>';
   if(miss.length){
     h+='<section class="card"><h2>間違えた歌 <span class="num">'+miss.length+'</span> 首</h2><ul class="miss">'+miss.map(function(r){return '<li>'+fullPoem(r.p)+(r.given?'<div class="note">あなたの答え: '+esc(r.given)+'</div>':'')+'</li>'}).join('')+'</ul></section>';
   }
@@ -594,18 +743,134 @@ function result(){
   $app.innerHTML=h;window.scrollTo(0,0);
 }
 
+/* ---------- pair mode ---------- */
+var P=null;
+function startPair(list){
+  stopTimer();if(Q)Q.active=false;
+  var l=list||makeList();
+  if(l.length<2)return;
+  var first=l.slice(0,4);
+  P={all:l,hide:S.pairHide==='shimo'?'shimo':'kami',kimari:S.kimari!==false,queue:l.slice(4),
+     up:shuffle(first),lo:shuffle(first),matched:{},flipped:{},selU:null,selL:null,miss:{},locked:false,doneN:0,retryList:[]};
+  showPair();
+}
+function pairUpperText(p){return P.kimari?kimarijiText(p):plainText(p,'kami',true)}
+function pairCard(side,p){
+  if(!p)return '<div class="pc empty" aria-hidden="true"></div>';
+  var part=side==='u'?'kami':'shimo';
+  var isDown=(P.hide===part)&&!P.flipped[side+p.no];
+  var done=!!P.matched[p.no];
+  var sel=(side==='u'?P.selU:P.selL)===p.no;
+  var cls='pc'+(isDown?' down':'')+(done?' done':'')+(sel?' sel':'');
+  var body,label;
+  if(isDown){body='<span class="back">タップでめくる</span>';label='伏せた札'}
+  else if(side==='u'&&P.kimari){body=vertHTML([moras(kimarijiText(p))],false);label=kimarijiText(p)}
+  else{body=vertHTML(phrases(p,part),false);label=plainText(p,part,true)}
+  return '<button class="'+cls+'" id="pc-'+side+p.no+'" data-act="pairpick" data-side="'+side+'" data-no="'+p.no+'"'+(done?' aria-disabled="true"':'')+' aria-label="'+esc(label)+'">'+body+'</button>';
+}
+function drawGrid(){
+  var g=document.getElementById('pgrid');if(!g)return;
+  g.innerHTML='<div class="pcol"><h3>上の句'+(P.kimari?'(決まり字)':'')+'</h3>'+P.up.map(function(p){return pairCard('u',p)}).join('')+'</div><div class="pcol"><h3>下の句</h3>'+P.lo.map(function(p){return pairCard('l',p)}).join('')+'</div>';
+  var bar=document.getElementById('pbar');if(bar)bar.style.width=(P.doneN/P.all.length*100)+'%';
+  var pn=document.getElementById('pnum');if(pn)pn.textContent=P.doneN+' / '+P.all.length;
+}
+function showPair(){
+  $app.className='pairview';
+  var h='<div class="prog"><span class="num" id="pnum"></span><div class="bar"><i id="pbar"></i></div><button class="btn small" data-act="quit">やめる</button></div>';
+  h+='<p class="note" style="margin:8px 0 0">上の句と下の句を1枚ずつ選んで組にします。'+(P.hide==='kami'?'上の句':'下の句')+'は伏せてあり、タップでめくれます。'+(P.kimari?'上の句は決まり字までを表示します。':'')+'</p>';
+  h+='<div class="pgrid" id="pgrid"></div><div id="pfb" class="note" role="status" aria-live="polite" style="min-height:1.6em;margin-top:10px"></div>';
+  $app.innerHTML=h;drawGrid();
+}
+function pairFind(no){return P.all.filter(function(x){return x.no===no})[0]}
+function pairPick(side,no){
+  if(!P||P.locked||P.matched[no])return;
+  var hiddenSide=P.hide==='kami'?'u':'l';
+  var flippedNow=false;
+  if(side===hiddenSide&&!P.flipped[side+no]){P.flipped[side+no]=true;flippedNow=true}
+  var key=side==='u'?'selU':'selL';
+  P[key]=(P[key]===no)?null:no;
+  drawGrid();
+  if(flippedNow){var el=document.getElementById('pc-'+side+no);if(el)el.classList.add('flip')}
+  if(P.selU!==null&&P.selL!==null)pairJudge();
+}
+function pairJudge(){
+  var u=P.selU,l=P.selL,fb=document.getElementById('pfb');
+  P.locked=true;
+  if(u===l){
+    var p=pairFind(u);
+    P.matched[u]=true;P.flipped['u'+u]=P.flipped['l'+u]=true;P.selU=P.selL=null;P.doneN++;
+    drawGrid();
+    fb.textContent='正解!'+(p.author?'('+p.author+')':'');
+    setTimeout(function(){
+      if(!P)return;
+      var nxt=P.queue.length?P.queue.shift():null;
+      var iu=P.up.indexOf(p),il=P.lo.indexOf(p);
+      P.up[iu]=nxt;P.lo[il]=nxt;
+      if(nxt&&iu===il){ // avoid the new pair sitting side by side
+        var others=[];P.lo.forEach(function(x,i){if(i!==il&&x&&!P.matched[x.no])others.push(i)});
+        if(others.length){var j=others[Math.floor(Math.random()*others.length)];var t=P.lo[j];P.lo[j]=P.lo[il];P.lo[il]=t}
+      }
+      if(!P.up.some(function(x){return x&&!P.matched[x.no]})&&!P.queue.length){pairResult();return}
+      P.locked=false;drawGrid();
+    },700);
+  }else{
+    ['u'+u,'l'+l].forEach(function(id){var c=document.getElementById('pc-'+id);if(c)c.classList.add('bad')});
+    [u,l].forEach(function(no){if(!P.miss[no]){P.miss[no]=true}});
+    fb.textContent='ちがいます。もう一度選んでください。';
+    setTimeout(function(){
+      if(!P)return;
+      P.selU=P.selL=null;P.locked=false;drawGrid();
+    },600);
+  }
+}
+function pairResult(){
+  $app.className='';
+  var n=P.all.length,missed=P.all.filter(function(p){return P.miss[p.no]});
+  var h='<header><h1>結果</h1><p class="sub">ペアトレーニング('+(P.hide==='kami'?'上の句を伏せる':'下の句を伏せる')+')</p></header>';
+  h+='<section class="card"><div class="big-score num">'+(n-missed.length)+' <span style="font-size:22px">/ '+n+'</span></div><p class="note" style="margin:6px 0 0">まちがえずに組にできた歌の数です。</p></section>';
+  if(missed.length)h+='<section class="card"><h2>まちがえた歌 <span class="num">'+missed.length+'</span> 首</h2><ul class="miss">'+missed.map(function(p){return '<li>'+fullPoem(p)+'</li>'}).join('')+'</ul></section>';
+  h+='<div class="modes">'+(missed.length>=2?'<button class="btn primary big" data-act="pairretry">まちがえた歌だけ復習する</button>':'')+'<button class="btn big" data-act="pairagain">もう一度(同じ設定)</button><button class="btn big" data-act="home">ホームへ</button></div>';
+  P.retryList=missed;
+  $app.innerHTML=h;window.scrollTo(0,0);
+}
+
+/* ---------- fit vertical text into its box (字余り・フォント差の吸収) ---------- */
+function fitAll(){
+  fitQueued=false;
+  var vs=[].slice.call(document.querySelectorAll('.vert'));if(!vs.length)return;
+  var minf=1;
+  vs.forEach(function(v){
+    var base=parseFloat(v.dataset.sc0||v.style.getPropertyValue('--sc'))||1;v.dataset.sc0=base;
+    v.style.setProperty('--sc',base);
+    var box=v.getBoundingClientRect(),need=0,phs=v.querySelectorAll('.ph');
+    for(var i=0;i<phs.length;i++){
+      var rg=document.createRange();rg.selectNodeContents(phs[i]);
+      var r=rg.getBoundingClientRect();if(r.height)need=Math.max(need,r.bottom-box.top);
+    }
+    if(box.height>0&&need>box.height+0.5)minf=Math.min(minf,box.height/need*0.99);
+  });
+  vs.forEach(function(v){v.style.setProperty('--sc',(parseFloat(v.dataset.sc0)*minf).toFixed(3))});
+}
+var fitQueued=false;
+function queueFit(){if(!fitQueued){fitQueued=true;requestAnimationFrame(fitAll)}}
+if(window.MutationObserver)new MutationObserver(queueFit).observe($app,{childList:true,subtree:true});
+window.addEventListener('resize',function(){document.querySelectorAll('.vert').forEach(function(v){delete v.dataset.sc0;v.style.setProperty('--sc','1')});queueFit()});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){document.querySelectorAll('.vert').forEach(function(v){v.style.setProperty('--sc',v.dataset.sc0||'1')});queueFit()});
+
 /* ---------- events ---------- */
 function refreshCount(){var c=document.getElementById('cnt');if(c)c.textContent=pool().length;
   var tn=document.getElementById('tagn');if(tn)tn.textContent=S.tags.length?S.tags.length+'件選択中':'';
+  var kn=document.getElementById('kjn');if(kn)kn.textContent=S.kjlen.length?S.kjlen.length+'件選択中':'';
+  var nn=document.getElementById('nsn');if(nn)nn.textContent=S.nsheet.length?S.nsheet.length+'件選択中':'';
   var fn=document.getElementById('feeln');if(fn)fn.textContent=S.feel.length?S.feel.length+'件選択中':'';
-  var dis=pool().length===0;document.querySelectorAll('[data-act="start4"],[data-act="startFill"]').forEach(function(b){b.disabled=dis})}
+  var dis=pool().length===0;document.querySelectorAll('[data-act="start4"],[data-act="startFill"],[data-act="startPair"]').forEach(function(b){b.disabled=dis||(b.dataset.act==='startPair'&&pool().length<2)})}
 $app.addEventListener('click',function(e){
   var t=e.target.closest('[data-act]');if(!t)return;
   var a=t.dataset.act;
   if(a==='home')return go(home);
   if(a==='data')return go(dataView);
-  if(a==='p-all'){S.from=1;S.to=100;S.tags=[];S.feel=[];saveSettings();return home()}
-  if(a==='p-10'){S.from=1;S.to=10;S.tags=[];S.feel=[];saveSettings();return home()}
+  if(a==='p-all'){S.from=1;S.to=100;S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];saveSettings();return home()}
+  if(a==='p-10'){S.from=1;S.to=10;S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];saveSettings();return home()}
   if(a==='p-koi'){S.from=1;S.to=100;S.tags=['恋'];S.feel=[];saveSettings();return home()}
   if(a==='p-aki'){S.from=1;S.to=100;S.tags=['秋'];S.feel=[];saveSettings();return home()}
   if(a==='g'||a==='f'){
@@ -613,12 +878,22 @@ $app.addEventListener('click',function(e){
     if(i>=0)arr.splice(i,1);else arr.push(g);
     saveSettings();t.setAttribute('aria-pressed',i<0);return refreshCount();
   }
-  if(a==='script'){S.script=t.dataset.s;saveSettings();return home()}
+  if(a==='kj'){var kv=parseInt(t.dataset.n,10),kx=S.kjlen.indexOf(kv);if(kx>=0)S.kjlen.splice(kx,1);else S.kjlen.push(kv);saveSettings();t.setAttribute('aria-pressed',kx<0);return refreshCount()}
+  if(a==='ns'){var nv=parseInt(t.dataset.n,10),ix=S.nsheet.indexOf(nv);if(ix>=0)S.nsheet.splice(ix,1);else S.nsheet.push(nv);saveSettings();t.setAttribute('aria-pressed',ix<0);return refreshCount()}
+  if(a==='script'){var sv=t.dataset.s==='kanji'?'kanji':'kana';if(t.dataset.p==='shimo')S.scriptS=sv;else S.scriptK=sv;saveSettings();return home()}
   if(a==='start4'){var l=makeList();if(l.length&&data.length>=4)startQuiz('choice',l);return}
   if(a==='startFill'){var l2=makeList();if(l2.length)startQuiz('fill',l2);return}
-  if(a==='quit')return go(home);
+  if(a==='startPair'){if(pool().length>=2){go(function(){startPair()})}return}
+  if(a==='pairhide'){S.pairHide=t.dataset.v==='shimo'?'shimo':'kami';saveSettings();return home()}
+  if(a==='pairpick')return pairPick(t.dataset.side,parseInt(t.dataset.no,10));
+  if(a==='pairagain'){if(pool().length>=2)startPair();return}
+  if(a==='pairretry'){startPair(shuffle(P.retryList));return}
+  if(a==='quit'){P=null;return go(home)}
   if(a==='pick')return pick(parseInt(t.dataset.k,10));
   if(a==='wakatta')return wakatta();
+  if(a==='kimari'){S.kimari=t.dataset.v==='1';saveSettings();return home()}
+  if(a==='dontknow')return dontknow();
+  if(a==='giveup')return giveUp();
   if(a==='submit')return submitFill();
   if(a==='next')return next();
   if(a==='again')return startQuiz(Q.mode,makeList());
@@ -629,7 +904,7 @@ $app.addEventListener('click',function(e){
     if(r.out.length<4)return dataView('読み込めた歌が'+r.out.length+'首でした。4首以上必要です。'+(r.errors.length?'<br>'+r.errors.slice(0,5).map(esc).join('<br>'):''));
     data=r.out;lsSet('hyakunin_data_v1',JSON.stringify(data));
     var mx=Math.max.apply(null,data.map(function(p){return p.no}));
-    S.from=1;S.to=Math.max(mx,10);S.tags=[];S.feel=[];saveSettings();
+    S.from=1;S.to=Math.max(mx,10);S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];saveSettings();
     return dataView('<strong>'+data.length+'首を読み込みました。</strong>'+(r.errors.length?'<br>読み込めなかった行 '+r.errors.length+' 件<br>'+r.errors.slice(0,8).map(esc).join('<br>'):'')+(r.warns.length?'<br>確認が必要な項目 '+r.warns.length+' 件(読み込み自体は済んでいます)<br>'+r.warns.slice(0,8).map(esc).join('<br>'):''));
   }
   if(a==='resetdemo'){lsDel('hyakunin_data_v1');data=DEMO.slice();S.from=1;S.to=100;saveSettings();return dataView('テスト用の歌に戻しました。')}
