@@ -154,6 +154,12 @@ ul{margin:0;padding:0}
   .poemfull .j{font-size:15px}
 }
 
+/* marks */
+.markbar{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.mk{font:inherit;font-size:18px;line-height:1;width:44px;height:44px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;color:var(--mkc)}
+.mk1{--mkc:#c98600}.mk2{--mkc:#d6455d}.mk3{--mkc:#2f86c4}.mk4{--mkc:#2f9a58}
+.mk[aria-pressed="true"]{background:var(--mkc);color:#fff;border-color:var(--mkc)}
+.mk.chipmk{width:auto;padding:0 12px;font-size:15px}
 /* pair mode */
 main.pairview{max-width:720px}
 .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:10px}
@@ -253,6 +259,14 @@ function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
 var $app=document.getElementById('app');
 var data=loadData();
 var S=loadSettings();
+/* 苦手マーク: 歌番号 -> 1〜4 */
+var MARKS=[{id:1,sym:'★',name:'星'},{id:2,sym:'♥',name:'ハート'},{id:3,sym:'◆',name:'ひし形'},{id:4,sym:'▲',name:'三角'}];
+var M=(function(){var o={};try{var r=JSON.parse(lsGet('hyakunin_marks_v1')||'{}');for(var k in r){var v=r[k];if(v>=1&&v<=4&&v===Math.floor(v)&&/^\d+$/.test(k))o[k]=v}}catch(e){}return o})();
+function saveMarks(){lsSet('hyakunin_marks_v1',JSON.stringify(M))}
+function markBar(p){
+  return '<div class="markbar" role="group" aria-label="苦手マーク"><span class="note" style="margin:0">苦手マーク</span>'+MARKS.map(function(m){
+    return '<button class="mk mk'+m.id+'" data-act="mark" data-no="'+p.no+'" data-m="'+m.id+'" aria-pressed="'+(M[p.no]===m.id)+'" aria-label="'+m.name+'のマーク">'+m.sym+'</button>'}).join('')+'</div>';
+}
 var timer=null, Q=null;
 
 function loadData(){
@@ -262,10 +276,12 @@ function loadData(){
 }
 function isDemo(){return data.length&&data[0].author==='デモ(オリジナル)'}
 function loadSettings(){
-  var d={from:1,to:100,tags:[],feel:[],speed:0.8,scriptK:'kana',scriptS:'kana',count:'all',kimari:true,pairHide:'kami',nsheet:[],kjlen:[]};
+  var d={from:1,to:100,tags:[],feel:[],speed:0.8,scriptK:'kana',scriptS:'kana',count:'all',kimari:true,pairHide:'kami',nsheet:[],kjlen:[],marks:[],fill4:true};
   var raw=lsGet('hyakunin_settings_v1');
   if(raw){try{var s=JSON.parse(raw);for(var k in d){if(s[k]!==undefined)d[k]=s[k]}
     if(s.script&&s.scriptK===undefined&&s.scriptS===undefined){d.scriptK=d.scriptS=(s.script==='kanji'?'kanji':'kana')}}catch(e){}}
+  d.fill4=d.fill4!==false;
+  d.marks=Array.isArray(d.marks)?d.marks.filter(function(x){return x>=1&&x<=4&&x===Math.floor(x)}):[];
   d.kjlen=Array.isArray(d.kjlen)?d.kjlen.filter(function(x){return typeof x==='number'&&isFinite(x)}):[];
   d.nsheet=Array.isArray(d.nsheet)?d.nsheet.filter(function(x){return typeof x==='number'&&isFinite(x)}):[];
   d.scriptK=d.scriptK==='kanji'?'kanji':'kana';d.scriptS=d.scriptS==='kanji'?'kanji':'kana';
@@ -351,7 +367,7 @@ function groupInfo(){
 function pool(){
   var gi=groupInfo();
   var anyOf=function(have,want){return !want.length||have.some(function(x){return want.indexOf(x)>=0})};
-  return data.filter(function(p){return p.no>=S.from&&p.no<=S.to&&anyOf(p.genres,S.tags)&&anyOf(p.feelings,S.feel)&&(!S.nsheet.length||S.nsheet.indexOf(gi.by[firstKana(p)])>=0)&&(!S.kjlen.length||S.kjlen.indexOf(kimariji(p))>=0)});
+  return data.filter(function(p){return p.no>=S.from&&p.no<=S.to&&anyOf(p.genres,S.tags)&&anyOf(p.feelings,S.feel)&&(!S.nsheet.length||S.nsheet.indexOf(gi.by[firstKana(p)])>=0)&&(!S.kjlen.length||S.kjlen.indexOf(kimariji(p))>=0)&&(!S.marks.length||S.marks.indexOf(M[p.no])>=0)});
 }
 
 /* ---------- views ---------- */
@@ -383,13 +399,17 @@ function home(){
   var kns=Object.keys(kg).map(Number).sort(function(a,b){return a-b});
   h+='<details class="fold"'+(S.kjlen.length?' open':'')+'><summary>決まり字の長さで絞る <span class="num count" id="kjn">'+(S.kjlen.length?S.kjlen.length+'件選択中':'')+'</span></summary><p class="note" style="margin:8px 0 0">決まり字(札を取れるまでの最短の文字数)が同じ歌のグループです。'+(data.length<100?'読み込んだ歌が100首未満のあいだは、本来より短くなります。':'')+'</p>'+
     kns.map(function(n){return '<div class="grp"><span class="gname">'+n+'字決まり '+kg[n].length+'首</span><div class="row"><button class="chip" data-act="kj" data-n="'+n+'" aria-pressed="'+(S.kjlen.indexOf(n)>=0)+'">'+n+'字決まり</button><span class="note" style="margin:0">'+kg[n].slice(0,12).map(function(p){return esc(kimarijiText(p))}).join('・')+(kg[n].length>12?'…':'')+'</span></div></div>'}).join('')+'</details>';
+  var mc={};data.forEach(function(p){if(M[p.no])mc[M[p.no]]=(mc[M[p.no]]||0)+1});
+  h+='<details class="fold"'+(S.marks.length?' open':'')+'><summary>苦手マークで絞る <span class="num count" id="mkn">'+(S.marks.length?S.marks.length+'件選択中':'')+'</span></summary><p class="note" style="margin:8px 0 0">答えの画面でつけたマークです。選んだマークの歌だけを出題します。</p><div class="row" style="margin-top:8px">'+
+    MARKS.map(function(m){return '<button class="mk chipmk mk'+m.id+'" data-act="mkf" data-m="'+m.id+'" aria-pressed="'+(S.marks.indexOf(m.id)>=0)+'">'+m.sym+' '+(mc[m.id]||0)+'首</button>'}).join('')+'</div></details>';
   h+='<p class="note" style="margin:10px 0 0">対象 <span class="count num" id="cnt">'+n+'</span> 首</p></section>';
   h+='<section class="card"><h2>設定</h2>';
   h+='<label class="f" for="speed"><span>上の句の表示速度 <span class="num" id="speedv">'+S.speed.toFixed(1)+'</span> 秒 / 1文字</span></label><input type="range" id="speed" min="0.2" max="2" step="0.1" value="'+S.speed+'">';
   h+='<div class="row" style="margin-top:12px;align-items:flex-start"><label class="f" for="count">出題数<select id="count">'+['10','20','50','all'].map(function(v){return '<option value="'+v+'"'+(String(S.count)===v?' selected':'')+'>'+(v==='all'?'全部':v+'問')+'</option>'}).join('')+'</select></label>';
   h+='<div class="f">上の句の表記<div class="row"><button class="chip" data-act="script" data-p="kami" data-s="kana" aria-pressed="'+(S.scriptK==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-p="kami" data-s="kanji" aria-pressed="'+(S.scriptK==='kanji')+'">漢字まじり</button></div></div>'+
     '<div class="f">下の句の表記<div class="row"><button class="chip" data-act="script" data-p="shimo" data-s="kana" aria-pressed="'+(S.scriptS==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-p="shimo" data-s="kanji" aria-pressed="'+(S.scriptS==='kanji')+'">漢字まじり</button></div></div>'+
-    '<div class="f">決まり字で止める<div class="row"><button class="chip" data-act="kimari" data-v="1" aria-pressed="'+S.kimari+'">オン</button><button class="chip" data-act="kimari" data-v="0" aria-pressed="'+(!S.kimari)+'">オフ</button></div></div></div>'+
+    '<div class="f">決まり字で止める<div class="row"><button class="chip" data-act="kimari" data-v="1" aria-pressed="'+S.kimari+'">オン</button><button class="chip" data-act="kimari" data-v="0" aria-pressed="'+(!S.kimari)+'">オフ</button></div></div>'+
+    '<div class="f">穴埋め: 四句だけでも正解<div class="row"><button class="chip" data-act="fill4" data-v="1" aria-pressed="'+(S.fill4!==false)+'">オン</button><button class="chip" data-act="fill4" data-v="0" aria-pressed="'+(S.fill4===false)+'">オフ</button></div></div></div>'+
     '<p class="note" style="margin:10px 0 0">'+(S.kimari?'上の句を決まり字まで表示して一度止まります。分からないときは「わからない」で続きを表示します。':'上の句が最後まで1文字ずつ表示されます。穴埋めは「わかった」で止めて答えます。')+'</p></section>';
   h+='</div>';
   if(data.length<100&&S.kimari)h+='<p class="note" style="margin:0">いま読み込んでいるのは'+data.length+'首です。決まり字は読み込んだ歌のなかで判定するので、100首そろうまでは本来より短くなります。</p>';
@@ -626,7 +646,7 @@ function fullPoem(p){
     '<div class="r">'+esc(plainText(p,'kami',true))+' / '+esc(plainText(p,'shimo',true))+'</div>'+
     '<div class="a">'+(isDemo()?'':'<span class="num">'+p.no+'</span>番　')+esc(p.author)+'</div>'+
     '<div class="note">決まり字: <strong style="color:var(--ink)">'+esc(kimarijiText(p))+'</strong>('+kimariji(p)+'文字)'+(data.length<100?'　※読み込んだ歌のなかでの判定':'')+'</div>'+
-    ((p.genres.length||p.feelings.length)?'<div class="note">'+(p.genres.length?'ジャンル: '+esc(p.genres.join('・')):'')+(p.genres.length&&p.feelings.length?'　':'')+(p.feelings.length?'気持ち: '+esc(p.feelings.join('・')):'')+'</div>':'')+'</div>';
+    ((p.genres.length||p.feelings.length)?'<div class="note">'+(p.genres.length?'ジャンル: '+esc(p.genres.join('・')):'')+(p.genres.length&&p.feelings.length?'　':'')+(p.feelings.length?'気持ち: '+esc(p.feelings.join('・')):'')+'</div>':'')+markBar(p)+'</div>';
 }
 function feedback(ok,extra){
   var p=Q.list[Q.i],last=Q.i>=Q.list.length-1;
@@ -675,7 +695,7 @@ function enterInput(manual){
   var all=Q.rev>=Q.total;
   document.getElementById('fb').innerHTML='<div class="card fb">'+
     (manual?'':'<p class="note" id="pnote" style="margin:0">'+(all?'上の句をすべて表示しました。':'決まり字まで表示しました。')+'</p>')+
-    '<label class="f" for="ans">下の句をひらがなで入力</label>'+
+    '<label class="f" for="ans">下の句をひらがなで入力'+(S.fill4!==false?'(四句だけでも正解)':'')+'</label>'+
     '<div class="ansrow"><input type="text" id="ans" lang="ja" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ひらがな"><button class="btn primary" data-act="submit">答える</button></div>'+
     (manual?'':'<button class="btn" style="width:100%" data-act="'+(all?'giveup':'dontknow')+'" id="dkBtn">'+(all?'降参して答えを見る':'わからない(続きを表示)')+'</button>')+
     '<p class="note" style="margin:0">「は」と「わ」、「へ」と「え」など同じ音は区別せずに判定します。</p></div>';
@@ -710,6 +730,13 @@ function giveUp(){
   Q.recs.push({p:p,ok:false,shown:Q.rev,more:Q.more,gaveUp:true});
   feedback(false);
 }
+/* 四句(下の句の前半)だけ取り出す。空白区切りがなければ7:7の比率で分ける */
+function shimoFirst(p,kana){
+  var t=String(kana?p.shimoKana:p.shimo).trim();
+  if(/[\s　]/.test(t))return t.split(/[\s　]+/)[0];
+  var u=kana?moras(t):Array.from(t);
+  return u.slice(0,Math.round(u.length/2)).join('');
+}
 function submitFill(){
   if(Q.stage!=='input'&&Q.stage!=='more')return;
   var v=document.getElementById('ans').value;
@@ -717,9 +744,15 @@ function submitFill(){
   Q.stage='done';Q.answered=true;
   freezeKami(false);
   var p=Q.list[Q.i];
-  var ok=norm(v)===norm(p.shimoKana)||v.replace(/[\s　]/g,'')===p.shimo.replace(/[\s　]/g,'');
-  Q.recs.push({p:p,ok:ok,shown:Q.rev,given:v,more:Q.more});
-  feedback(ok,'<div class="note">あなたの答え: <strong style="color:var(--ink)">'+esc(v)+'</strong></div>');
+  var full=norm(v)===norm(p.shimoKana)||v.replace(/[\s　]/g,'')===p.shimo.replace(/[\s　]/g,'');
+  var half=false;
+  if(!full&&S.fill4!==false){
+    var f1=shimoFirst(p,true),f2=shimoFirst(p,false);
+    half=(norm(v.replace(/[\s　]/g,''))===norm(f1.replace(/[\s　]/g,''))||v.replace(/[\s　]/g,'')===f2.replace(/[\s　]/g,''));
+  }
+  var ok=full||half;
+  Q.recs.push({p:p,ok:ok,shown:Q.rev,given:v,more:Q.more,half:half});
+  feedback(ok,'<div class="note">あなたの答え: <strong style="color:var(--ink)">'+esc(v)+'</strong>'+(half?'(四句だけで正解にしました)':'')+'</div>');
 }
 function next(){
   if(Q.i>=Q.list.length-1){result();return}
@@ -860,6 +893,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){doc
 /* ---------- events ---------- */
 function refreshCount(){var c=document.getElementById('cnt');if(c)c.textContent=pool().length;
   var tn=document.getElementById('tagn');if(tn)tn.textContent=S.tags.length?S.tags.length+'件選択中':'';
+  var mn=document.getElementById('mkn');if(mn)mn.textContent=S.marks.length?S.marks.length+'件選択中':'';
   var kn=document.getElementById('kjn');if(kn)kn.textContent=S.kjlen.length?S.kjlen.length+'件選択中':'';
   var nn=document.getElementById('nsn');if(nn)nn.textContent=S.nsheet.length?S.nsheet.length+'件選択中':'';
   var fn=document.getElementById('feeln');if(fn)fn.textContent=S.feel.length?S.feel.length+'件選択中':'';
@@ -869,8 +903,8 @@ $app.addEventListener('click',function(e){
   var a=t.dataset.act;
   if(a==='home')return go(home);
   if(a==='data')return go(dataView);
-  if(a==='p-all'){S.from=1;S.to=100;S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];saveSettings();return home()}
-  if(a==='p-10'){S.from=1;S.to=10;S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];saveSettings();return home()}
+  if(a==='p-all'){S.from=1;S.to=100;S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];S.marks=[];saveSettings();return home()}
+  if(a==='p-10'){S.from=1;S.to=10;S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];S.marks=[];saveSettings();return home()}
   if(a==='p-koi'){S.from=1;S.to=100;S.tags=['恋'];S.feel=[];saveSettings();return home()}
   if(a==='p-aki'){S.from=1;S.to=100;S.tags=['秋'];S.feel=[];saveSettings();return home()}
   if(a==='g'||a==='f'){
@@ -878,6 +912,15 @@ $app.addEventListener('click',function(e){
     if(i>=0)arr.splice(i,1);else arr.push(g);
     saveSettings();t.setAttribute('aria-pressed',i<0);return refreshCount();
   }
+  if(a==='fill4'){S.fill4=t.dataset.v==='1';saveSettings();return home()}
+  if(a==='mark'){
+    var mno=parseInt(t.dataset.no,10),mid=parseInt(t.dataset.m,10);
+    if(M[mno]===mid)delete M[mno];else M[mno]=mid;
+    saveMarks();
+    var bar=t.closest('.markbar');if(bar)bar.querySelectorAll('.mk').forEach(function(b){b.setAttribute('aria-pressed',M[mno]===parseInt(b.dataset.m,10))});
+    return;
+  }
+  if(a==='mkf'){var fv=parseInt(t.dataset.m,10),fx=S.marks.indexOf(fv);if(fx>=0)S.marks.splice(fx,1);else S.marks.push(fv);saveSettings();t.setAttribute('aria-pressed',fx<0);return refreshCount()}
   if(a==='kj'){var kv=parseInt(t.dataset.n,10),kx=S.kjlen.indexOf(kv);if(kx>=0)S.kjlen.splice(kx,1);else S.kjlen.push(kv);saveSettings();t.setAttribute('aria-pressed',kx<0);return refreshCount()}
   if(a==='ns'){var nv=parseInt(t.dataset.n,10),ix=S.nsheet.indexOf(nv);if(ix>=0)S.nsheet.splice(ix,1);else S.nsheet.push(nv);saveSettings();t.setAttribute('aria-pressed',ix<0);return refreshCount()}
   if(a==='script'){var sv=t.dataset.s==='kanji'?'kanji':'kana';if(t.dataset.p==='shimo')S.scriptS=sv;else S.scriptK=sv;saveSettings();return home()}
@@ -904,7 +947,7 @@ $app.addEventListener('click',function(e){
     if(r.out.length<4)return dataView('読み込めた歌が'+r.out.length+'首でした。4首以上必要です。'+(r.errors.length?'<br>'+r.errors.slice(0,5).map(esc).join('<br>'):''));
     data=r.out;lsSet('hyakunin_data_v1',JSON.stringify(data));
     var mx=Math.max.apply(null,data.map(function(p){return p.no}));
-    S.from=1;S.to=Math.max(mx,10);S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];saveSettings();
+    S.from=1;S.to=Math.max(mx,10);S.tags=[];S.feel=[];S.nsheet=[];S.kjlen=[];S.marks=[];saveSettings();
     return dataView('<strong>'+data.length+'首を読み込みました。</strong>'+(r.errors.length?'<br>読み込めなかった行 '+r.errors.length+' 件<br>'+r.errors.slice(0,8).map(esc).join('<br>'):'')+(r.warns.length?'<br>確認が必要な項目 '+r.warns.length+' 件(読み込み自体は済んでいます)<br>'+r.warns.slice(0,8).map(esc).join('<br>'):''));
   }
   if(a==='resetdemo'){lsDel('hyakunin_data_v1');data=DEMO.slice();S.from=1;S.to=100;saveSettings();return dataView('テスト用の歌に戻しました。')}
@@ -937,7 +980,7 @@ $app.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target.id==='a
 document.addEventListener('click',function(e){
   if(!Q||!Q.active||Q.mode!=='choice'||Q.stage!=='done'||Date.now()<Q.nextOkAt)return;
   var t=e.target.closest&&e.target.closest('[data-act]');
-  if(t&&(t.dataset.act==='next'||t.dataset.act==='quit'))return;
+  if(t&&(t.dataset.act==='next'||t.dataset.act==='quit'||t.dataset.act==='mark'))return;
   next();
 });
 
