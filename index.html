@@ -140,7 +140,7 @@ ul{margin:0;padding:0}
   main.quiz>*{min-width:0}
   main.quiz>.prog{grid-column:1/-1}
   main.quiz>.kami{grid-column:1;grid-row:2 / span 3;align-self:stretch}
-  main.quiz>.opts,main.quiz>#fb{grid-column:2}
+  main.quiz>.opts,main.quiz>#fb,main.quiz>.ta{grid-column:2}
 }
 /* phone held sideways: little height, plenty of width */
 @media (orientation:landscape) and (max-height:520px){
@@ -154,6 +154,15 @@ ul{margin:0;padding:0}
   .poemfull .j{font-size:15px}
 }
 
+/* time attack */
+.ta{display:flex;flex-direction:column;gap:4px}
+.ta .bar{flex:none;width:100%}
+.ta .bar i{transition:width .1s linear}
+.ta.over .bar i{background:var(--ng)}
+.ta.over .note{color:var(--ng);font-weight:700}
+.opt.hint{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 45%,transparent);animation:hintpulse 1s ease-in-out infinite}
+@keyframes hintpulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 25%,transparent)}}
+@media (prefers-reduced-motion: reduce){.opt.hint{animation:none}}
 /* marks */
 .markbar{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
 .mk{font:inherit;font-size:18px;line-height:1;width:44px;height:44px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;color:var(--mkc)}
@@ -276,11 +285,11 @@ function loadData(){
 }
 function isDemo(){return data.length&&data[0].author==='デモ(オリジナル)'}
 function loadSettings(){
-  var d={from:1,to:100,tags:[],feel:[],speed:0.8,scriptK:'kana',scriptS:'kana',count:'all',kimari:true,pairHide:'kami',nsheet:[],kjlen:[],marks:[],fill4:true,confuse:true};
+  var d={from:1,to:100,tags:[],feel:[],speed:0.8,scriptK:'kana',scriptS:'kana',count:'all',kimari:true,pairHide:'kami',nsheet:[],kjlen:[],marks:[],fill4:true,confuse:true,target:5};
   var raw=lsGet('hyakunin_settings_v1');
   if(raw){try{var s=JSON.parse(raw);for(var k in d){if(s[k]!==undefined)d[k]=s[k]}
     if(s.script&&s.scriptK===undefined&&s.scriptS===undefined){d.scriptK=d.scriptS=(s.script==='kanji'?'kanji':'kana')}}catch(e){}}
-  d.fill4=d.fill4!==false;d.confuse=d.confuse!==false;
+  d.target=(typeof d.target==='number'&&d.target>=1&&d.target<=60)?d.target:5;d.fill4=d.fill4!==false;d.confuse=d.confuse!==false;
   d.marks=Array.isArray(d.marks)?d.marks.filter(function(x){return x>=1&&x<=4&&x===Math.floor(x)}):[];
   d.kjlen=Array.isArray(d.kjlen)?d.kjlen.filter(function(x){return typeof x==='number'&&isFinite(x)}):[];
   d.nsheet=Array.isArray(d.nsheet)?d.nsheet.filter(function(x){return typeof x==='number'&&isFinite(x)}):[];
@@ -372,7 +381,7 @@ function pool(){
 
 /* ---------- views ---------- */
 function stopTimer(){if(timer){clearInterval(timer);timer=null}}
-function go(fn){stopTimer();if(Q)Q.active=false;fn();window.scrollTo(0,0)}
+function go(fn){stopTimer();stopTA();if(Q)Q.active=false;fn();window.scrollTo(0,0)}
 
 function chipHTML(kind,val,arr){
   return '<button class="chip" data-act="'+kind+'" data-g="'+esc(val)+'" aria-pressed="'+(arr.indexOf(val)>=0)+'">'+esc(val)+'</button>';
@@ -409,13 +418,15 @@ function home(){
   h+='<div class="f">上の句の表記<div class="row"><button class="chip" data-act="script" data-p="kami" data-s="kana" aria-pressed="'+(S.scriptK==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-p="kami" data-s="kanji" aria-pressed="'+(S.scriptK==='kanji')+'">漢字まじり</button></div></div>'+
     '<div class="f">下の句の表記<div class="row"><button class="chip" data-act="script" data-p="shimo" data-s="kana" aria-pressed="'+(S.scriptS==='kana')+'">ひらがな</button><button class="chip" data-act="script" data-p="shimo" data-s="kanji" aria-pressed="'+(S.scriptS==='kanji')+'">漢字まじり</button></div></div>'+
     '<div class="f">決まり字で止める<div class="row"><button class="chip" data-act="kimari" data-v="1" aria-pressed="'+S.kimari+'">オン</button><button class="chip" data-act="kimari" data-v="0" aria-pressed="'+(!S.kimari)+'">オフ</button></div></div>'+
+    '<div class="f">タイムアタックの目標(1首あたり)<div class="row">'+[3,5,8,10,15].map(function(v){return '<button class="chip" data-act="target" data-v="'+v+'" aria-pressed="'+(S.target===v)+'">'+v+'秒</button>'}).join('')+'</div></div>'+
     '<div class="f">4択: 似た札を混ぜる<div class="row"><button class="chip" data-act="confuse" data-v="1" aria-pressed="'+(S.confuse!==false)+'">オン</button><button class="chip" data-act="confuse" data-v="0" aria-pressed="'+(S.confuse===false)+'">オフ</button></div></div>'+
     '<div class="f">穴埋め: 四句だけでも正解<div class="row"><button class="chip" data-act="fill4" data-v="1" aria-pressed="'+(S.fill4!==false)+'">オン</button><button class="chip" data-act="fill4" data-v="0" aria-pressed="'+(S.fill4===false)+'">オフ</button></div></div></div>'+
     '<p class="note" style="margin:10px 0 0">'+(S.kimari?'上の句を決まり字まで表示して一度止まります。分からないときは「わからない」で続きを表示します。':'上の句が最後まで1文字ずつ表示されます。穴埋めは「わかった」で止めて答えます。')+'</p></section>';
   h+='</div>';
   if(data.length<100&&S.kimari)h+='<p class="note" style="margin:0">いま読み込んでいるのは'+data.length+'首です。決まり字は読み込んだ歌のなかで判定するので、100首そろうまでは本来より短くなります。</p>';
   h+='<section class="modes"><button class="btn primary big" data-act="start4"'+(n?'':' disabled')+'>4択トレーニング<small>'+(S.kimari?'決まり字まで表示して止まる。下の句を4つから選ぶ':'上の句が1文字ずつ出る。下の句を4つから選ぶ')+'</small></button>';
-  h+='<button class="btn primary big" data-act="startFill"'+(n?'':' disabled')+'>穴埋めトレーニング<small>'+(S.kimari?'決まり字まで表示して止まる。下の句を打ち込む':'「わかった」で止めて、下の句を打ち込む')+'</small></button></section>';
+  h+='<button class="btn primary big" data-act="startFill"'+(n?'':' disabled')+'>穴埋めトレーニング<small>'+(S.kimari?'決まり字まで表示して止まる。下の句を打ち込む':'「わかった」で止めて、下の句を打ち込む')+'</small></button>';
+  h+='<button class="btn primary big" data-act="startAttack"'+(n?'':' disabled')+'>タイムアタック<small>4択形式。目標 '+S.target+'秒を過ぎると正解の札が光る</small></button></section>';
   h+='<section class="card"><h2>ペアトレーニング</h2><p class="note" style="margin:0 0 8px">上の句4枚と下の句4枚から、正しい組を作ります。つなげると次の札が出ます。</p>';
   h+='<div class="f" style="margin-top:10px">伏せる札<div class="row"><button class="chip" data-act="pairhide" data-v="kami" aria-pressed="'+(S.pairHide!=='shimo')+'">上の句を伏せる(下の句が表)</button><button class="chip" data-act="pairhide" data-v="shimo" aria-pressed="'+(S.pairHide==='shimo')+'">下の句を伏せる(上の句が表)</button></div></div>';
   h+='<div class="modes" style="margin-top:12px"><button class="btn primary big" data-act="startPair"'+(n>=2?'':' disabled')+'>ペアトレーニングを始める<small>伏せた札はタップでめくれる。出題数は設定の「出題数」に従う</small></button></div></section>';
@@ -595,9 +606,29 @@ function pickDistractors(p){
   rest.forEach(function(x){if(out.length<3&&out.indexOf(x)<0)out.push(x)});
   return out;
 }
-function startQuiz(mode,list){
-  stopTimer();
-  Q={mode:mode,list:list,i:0,recs:[],answered:false,rev:0,total:0,opts:null,stage:'ask',active:true,nextOkAt:0,more:false,gaveUp:false,pauseAt:0,kim:0,tick:null,kimari:S.kimari!==false};
+var taTimer=null;
+function stopTA(){if(taTimer){clearInterval(taTimer);taTimer=null}}
+/* タイムアタック: 目標時間を過ぎたら正解の選択肢を光らせる */
+function startTA(){
+  stopTA();Q.t0=Date.now();
+  var q=Q;
+  var upd=function(){
+    if(!Q||Q!==q||Q.stage==='done'||!Q.active){stopTA();return}
+    var el=(Date.now()-Q.t0)/1000,T=Q.target;
+    var bar=document.getElementById('tabar'),tx=document.getElementById('tatxt');
+    if(bar)bar.style.width=Math.min(100,el/T*100)+'%';
+    if(el>=T){
+      if(tx)tx.textContent='目標時間を過ぎました';
+      var cur=Q.list[Q.i];
+      document.querySelectorAll('.opt').forEach(function(b,i){if(Q.opts&&Q.opts[i]&&Q.opts[i].no===cur.no)b.classList.add('hint')});
+      var wrap=document.getElementById('tabox');if(wrap)wrap.classList.add('over');
+    }else if(tx)tx.textContent='目標 '+T+'秒 ／ 残り '+Math.max(0,T-el).toFixed(1)+'秒';
+  };
+  taTimer=setInterval(upd,100);upd();
+}
+function startQuiz(mode,list,attack){
+  stopTimer();stopTA();
+  Q={attack:!!attack,target:S.target,t0:0,mode:mode,list:list,i:0,recs:[],answered:false,rev:0,total:0,opts:null,stage:'ask',active:true,nextOkAt:0,more:false,gaveUp:false,pauseAt:0,kim:0,tick:null,kimari:S.kimari!==false};
   showQ();
 }
 function makeList(){
@@ -616,6 +647,7 @@ function showQ(){
   var kanaLen=Math.max(1,moras(squash(p.kamiKana)).length);
   Q.pauseAt=Q.kimari?Math.max(1,Math.min(Q.total,dispKana?Q.kim:Math.ceil(Q.kim/kanaLen*Q.total))):Q.total;
   var h='<div class="prog"><span class="num">'+(Q.i+1)+' / '+Q.list.length+'</span><div class="bar"><i style="width:'+(Q.i/Q.list.length*100)+'%"></i></div><button class="btn small" data-act="quit">やめる</button></div>';
+  if(Q.attack)h+='<div class="ta" id="tabox"><span id="tatxt" class="note" style="margin:0"></span><div class="bar"><i id="tabar"></i></div></div>';
   h+='<div class="kami" id="kami">'+vertHTML(kp,true)+'</div>';
   if(Q.mode==='choice'){
     var others=pickDistractors(p);
@@ -642,6 +674,7 @@ function showQ(){
     }
   };
   Q.tick=tick;
+  if(Q.attack)startTA();
   setTimeout(function(){if(Q&&!Q.answered&&Q.stage==='ask'&&!timer){timer=setInterval(tick,Math.max(100,S.speed*1000));tick()}},350);
 }
 function freezeKami(keepHidden){
@@ -689,8 +722,9 @@ function pick(k){
     if(Q.opts[i].no===p.no)b.classList.add('correct');
     else if(i===k)b.classList.add('wrong');
   });
-  Q.recs.push({p:p,ok:ok,shown:Q.rev,more:Q.more});
-  feedback(ok);
+  var ms=Q.attack?Date.now()-Q.t0:0;stopTA();
+  Q.recs.push({p:p,ok:ok,shown:Q.rev,more:Q.more,ms:ms,inTime:Q.attack&&ms<=Q.target*1000});
+  feedback(ok,Q.attack?'<div class="note">解答時間 <strong style="color:var(--ink)">'+(ms/1000).toFixed(1)+'</strong>秒(目標 '+Q.target+'秒)'+(ms<=Q.target*1000?'　目標内':'　目標超過')+'</div>':'');
 }
 function enterPause(){
   if(Q.stage!=='ask')return;
@@ -781,14 +815,18 @@ function next(){
   Q.i++;showQ();window.scrollTo(0,0);
 }
 function result(){
-  stopTimer();if(Q)Q.active=false;
+  stopTimer();stopTA();if(Q)Q.active=false;
   $app.className='';
   var n=Q.recs.length,ok=Q.recs.filter(function(r){return r.ok}).length;
   var okRecs=Q.recs.filter(function(r){return r.ok});
   var avg=okRecs.length?(okRecs.reduce(function(a,r){return a+r.shown},0)/okRecs.length):null;
   var miss=Q.recs.filter(function(r){return !r.ok});
-  var h='<header><h1>結果</h1><p class="sub">'+(Q.mode==='choice'?'4択トレーニング':'穴埋めトレーニング')+'</p></header>';
+  var h='<header><h1>結果</h1><p class="sub">'+(Q.attack?'タイムアタック(目標 '+Q.target+'秒/首)':(Q.mode==='choice'?'4択トレーニング':'穴埋めトレーニング'))+'</p></header>';
   h+='<section class="card"><div class="big-score num">'+ok+' <span style="font-size:22px">/ '+n+'</span></div><p class="note" style="margin:6px 0 0">正答率 <span class="num">'+(n?Math.round(ok/n*100):0)+'</span>%'+(Q.kimari?'　決まり字までで正解 <span class="num">'+Q.recs.filter(function(r){return r.ok&&!r.more}).length+'</span> 首':(avg!==null?'　正解した歌の平均は <span class="num">'+avg.toFixed(1)+'</span> 文字目':''))+'</p>';
+  if(Q.attack){
+    var inT=Q.recs.filter(function(r){return r.ok&&r.inTime}).length,avgT=Q.recs.length?Q.recs.reduce(function(a,r){return a+r.ms},0)/Q.recs.length/1000:0;
+    h+='<p class="note" style="margin:6px 0 0">目標時間内に正解 <span class="num">'+inT+'</span> 首 ／ 平均解答時間 <span class="num">'+avgT.toFixed(1)+'</span> 秒</p>';
+  }
   h+='<p class="note" style="margin:4px 0 0">'+(Q.kimari?'「わからない」を使わずに決まり字までで答えられた歌が多いほど、札を取る力がついています。':'平均の文字数が少ないほど、早く決まり字に気づけています。')+'</p></section>';
   if(miss.length){
     h+='<section class="card"><h2>間違えた歌 <span class="num">'+miss.length+'</span> 首</h2><ul class="miss">'+miss.map(function(r){return '<li>'+fullPoem(r.p)+(r.given?'<div class="note">あなたの答え: '+esc(r.given)+'</div>':'')+'</li>'}).join('')+'</ul></section>';
@@ -919,7 +957,7 @@ function refreshCount(){var c=document.getElementById('cnt');if(c)c.textContent=
   var kn=document.getElementById('kjn');if(kn)kn.textContent=S.kjlen.length?S.kjlen.length+'件選択中':'';
   var nn=document.getElementById('nsn');if(nn)nn.textContent=S.nsheet.length?S.nsheet.length+'件選択中':'';
   var fn=document.getElementById('feeln');if(fn)fn.textContent=S.feel.length?S.feel.length+'件選択中':'';
-  var dis=pool().length===0;document.querySelectorAll('[data-act="start4"],[data-act="startFill"],[data-act="startPair"]').forEach(function(b){b.disabled=dis||(b.dataset.act==='startPair'&&pool().length<2)})}
+  var dis=pool().length===0;document.querySelectorAll('[data-act="start4"],[data-act="startFill"],[data-act="startPair"],[data-act="startAttack"]').forEach(function(b){b.disabled=dis||(b.dataset.act==='startPair'&&pool().length<2)})}
 $app.addEventListener('click',function(e){
   var t=e.target.closest('[data-act]');if(!t)return;
   var a=t.dataset.act;
@@ -947,6 +985,8 @@ $app.addEventListener('click',function(e){
   if(a==='kj'){var kv=parseInt(t.dataset.n,10),kx=S.kjlen.indexOf(kv);if(kx>=0)S.kjlen.splice(kx,1);else S.kjlen.push(kv);saveSettings();t.setAttribute('aria-pressed',kx<0);return refreshCount()}
   if(a==='ns'){var nv=parseInt(t.dataset.n,10),ix=S.nsheet.indexOf(nv);if(ix>=0)S.nsheet.splice(ix,1);else S.nsheet.push(nv);saveSettings();t.setAttribute('aria-pressed',ix<0);return refreshCount()}
   if(a==='script'){var sv=t.dataset.s==='kanji'?'kanji':'kana';if(t.dataset.p==='shimo')S.scriptS=sv;else S.scriptK=sv;saveSettings();return home()}
+  if(a==='startAttack'){var la=makeList();if(la.length&&data.length>=4)startQuiz('choice',la,true);return}
+  if(a==='target'){S.target=parseInt(t.dataset.v,10);saveSettings();return home()}
   if(a==='start4'){var l=makeList();if(l.length&&data.length>=4)startQuiz('choice',l);return}
   if(a==='startFill'){var l2=makeList();if(l2.length)startQuiz('fill',l2);return}
   if(a==='startPair'){if(pool().length>=2){go(function(){startPair()})}return}
@@ -963,8 +1003,8 @@ $app.addEventListener('click',function(e){
   if(a==='giveup')return giveUp();
   if(a==='submit')return submitFill();
   if(a==='next')return next();
-  if(a==='again')return startQuiz(Q.mode,makeList());
-  if(a==='retry')return startQuiz(Q.mode,shuffle(Q.missList));
+  if(a==='again')return startQuiz(Q.mode,makeList(),Q.attack);
+  if(a==='retry')return startQuiz(Q.mode,shuffle(Q.missList),Q.attack);
   if(a==='import'){
     var r=parseImport(document.getElementById('importText').value);
     if(r.err)return dataView(esc(r.err));
